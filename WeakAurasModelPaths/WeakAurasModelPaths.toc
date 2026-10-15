@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Title: WeakAuras Model Paths
 ## Author: The WeakAuras Team
-## Version: 5.22.1
+## Version: 5.22.2
 ## IconTexture: Interface\AddOns\WeakAuras\Media\Textures\icon.blp
 ## Notes: Model paths for WeakAuras
 ## Notes-ruRU: Ссылки на файлы моделей WeakAuras
