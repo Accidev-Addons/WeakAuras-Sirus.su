@@ -448,7 +448,7 @@ local function ScanFrames(depth, frame, ...)
   end
   if depth < maxDepth and type(rawget(frame, 0)) == "userdata" then
     local frameType = frame:GetObjectType()
-    if frameType == "Frame" or frameType == "Button" then
+    if (frameType == "Frame" or frameType == "Button") and frame:IsVisible() then
       ScanFrames(depth + 1, frame:GetChildren())
     end
     if frameType == "Button" then

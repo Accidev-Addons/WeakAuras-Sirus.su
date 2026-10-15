@@ -182,6 +182,27 @@ local blockedNamespaceFunctions = {
     SetTradeMoney = true,
     PickupTradeMoney = true,
   },
+  C_BattlePass = {
+    PurchasePremium = true,
+    PurchaseExperience = true,
+    PurchaseExperienceOptionsForLevel = true,
+  },
+  C_Talent = {
+    PurchaseSecondSpec = true,
+  },
+  C_StableInfo = {
+    AbandonPet = true,
+  },
+  C_AuctionHouse = {
+    PlaceBid = true,
+    PostItem = true,
+    PostCommodity = true,
+    StartCommoditiesPurchase = true,
+    ConfirmCommoditiesPurchase = true,
+  },
+  C_BlackMarket = {
+    ItemPlaceBid = true,
+  },
 }
 
 local blockedTables = {
