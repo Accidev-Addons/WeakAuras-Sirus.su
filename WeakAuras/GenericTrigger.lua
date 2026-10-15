@@ -2011,8 +2011,11 @@ do
     end
     if not(updating) then
       update_frame:SetScript("OnUpdate", function(self, elapsed)
-        if not(WeakAuras.IsPaused()) then
-          Private.ScanEvents("FRAME_UPDATE", elapsed);
+        local event_list = loaded_events["FRAME_UPDATE"]
+        if event_list and not WeakAuras.IsPaused() then
+          Private.StartProfileSystem("generictrigger FRAME_UPDATE")
+          Private.ScanEventsInternal(event_list, "FRAME_UPDATE", elapsed)
+          Private.StopProfileSystem("generictrigger FRAME_UPDATE")
         end
       end);
       updating = true;
@@ -2745,6 +2748,7 @@ do
 	}
 
 	local mark_ACTIONBAR_UPDATE_COOLDOWN, mark_PLAYER_ENTERING_WORLD
+  local mark_SPELL_COOLDOWN_CHECK, mark_ITEM_COOLDOWN_CHECK, mark_SLOT_COOLDOWN_CHECK
 
   ---@type fun()
   function Private.InitCooldownReady()
@@ -2787,32 +2791,57 @@ do
 				cdReadyFrame:Show()
 				return
 			end
+      if event == "SPELL_UPDATE_USABLE" then
+        mark_ITEM_COOLDOWN_CHECK = true
+        mark_SLOT_COOLDOWN_CHECK = true
+        cdReadyFrame:Show()
+        return
+      end
+      if event == "SPELL_UPDATE_COOLDOWN" or event == "RUNE_POWER_UPDATE" or event == "RUNE_TYPE_UPDATE" then
+        if event == "SPELL_UPDATE_COOLDOWN" then
+          mark_ACTIONBAR_UPDATE_COOLDOWN = nil
+        end
+        mark_SPELL_COOLDOWN_CHECK = true
+        mark_ITEM_COOLDOWN_CHECK = true
+        mark_SLOT_COOLDOWN_CHECK = true
+        cdReadyFrame:Show()
+        return
+      end
+      if event == "UNIT_INVENTORY_CHANGED" and ... == "player" or event == "BAG_UPDATE_COOLDOWN" or event == "PLAYER_EQUIPMENT_CHANGED" then
+        mark_SLOT_COOLDOWN_CHECK = true
+        cdReadyFrame:Show()
+        return
+      end
 
       Private.StartProfileSystem("generictrigger cd tracking");
       if type(event) == "number" then-- Called from OnUpdate!
-        if mark_PLAYER_ENTERING_WORLD then
-          SpellDetails:CheckSpellKnown()
+        if mark_PLAYER_ENTERING_WORLD or mark_ACTIONBAR_UPDATE_COOLDOWN then
+          if mark_PLAYER_ENTERING_WORLD then
+            SpellDetails:CheckSpellKnown()
+          end
           Private.CheckCooldownReady()
           Private.CheckItemCooldowns()
           Private.CheckItemSlotCooldowns()
           mark_PLAYER_ENTERING_WORLD = nil
           mark_ACTIONBAR_UPDATE_COOLDOWN = nil
-        elseif mark_ACTIONBAR_UPDATE_COOLDOWN then
-          Private.CheckCooldownReady()
-          Private.CheckItemCooldowns()
-          Private.CheckItemSlotCooldowns()
-          mark_ACTIONBAR_UPDATE_COOLDOWN = nil
+          mark_SPELL_COOLDOWN_CHECK = nil
+          mark_ITEM_COOLDOWN_CHECK = nil
+          mark_SLOT_COOLDOWN_CHECK = nil
+        else
+          if mark_ITEM_COOLDOWN_CHECK then
+            Private.CheckItemCooldowns()
+            mark_ITEM_COOLDOWN_CHECK = nil
+          end
+          if mark_SLOT_COOLDOWN_CHECK then
+            Private.CheckItemSlotCooldowns()
+            mark_SLOT_COOLDOWN_CHECK = nil
+          end
+          if mark_SPELL_COOLDOWN_CHECK then
+            Private.CheckCooldownReady()
+            mark_SPELL_COOLDOWN_CHECK = nil
+          end
         end
-      elseif event == "SPELL_UPDATE_USABLE" then
-        Private.CheckItemCooldowns()
-        Private.CheckItemSlotCooldowns()
-      elseif event == "SPELL_UPDATE_COOLDOWN" or event == "RUNE_POWER_UPDATE"
-        or event == "PLAYER_TALENT_UPDATE"
-        or event == "CHARACTER_POINTS_CHANGED" or event == "RUNE_TYPE_UPDATE"
-      then
-        if event == "SPELL_UPDATE_COOLDOWN" then
-          mark_ACTIONBAR_UPDATE_COOLDOWN = nil
-        end
+      elseif event == "PLAYER_TALENT_UPDATE" or event == "CHARACTER_POINTS_CHANGED" then
         Private.CheckItemCooldowns()
         Private.CheckItemSlotCooldowns()
         Private.CheckCooldownReady()
@@ -2831,11 +2860,11 @@ do
             end
           end
         end
-      elseif(event == "UNIT_INVENTORY_CHANGED" and ... == "player" or event == "BAG_UPDATE_COOLDOWN" or event == "PLAYER_EQUIPMENT_CHANGED") then
-        Private.CheckItemSlotCooldowns();
       end
       Private.StopProfileSystem("generictrigger cd tracking");
-      if mark_PLAYER_ENTERING_WORLD == nil and mark_ACTIONBAR_UPDATE_COOLDOWN == nil then
+      if mark_PLAYER_ENTERING_WORLD == nil and mark_ACTIONBAR_UPDATE_COOLDOWN == nil
+        and mark_SPELL_COOLDOWN_CHECK == nil and mark_ITEM_COOLDOWN_CHECK == nil and mark_SLOT_COOLDOWN_CHECK == nil
+      then
         cdReadyFrame:Hide()
       else
         cdReadyFrame:Show()
@@ -3909,14 +3938,22 @@ do
 	local function nameplateTargetOnEvent(self, event, unit)
 		if event == "NAME_PLATE_UNIT_ADDED" then
 			nameplateTargets[unit] = UnitGUID(unit .. "-target") or true
+			self:Show()
 		elseif event == "NAME_PLATE_UNIT_REMOVED" then
 			nameplateTargets[unit] = nil
+			if not next(nameplateTargets) then
+				self:Hide()
+			end
 		end
 	end
 
 	local tick_throttle = 0.2
 	local throttle_update = tick_throttle
 	local function nameplateTargetOnUpdate(self, delta)
+		if not next(nameplateTargets) then
+			self:Hide()
+			return
+		end
 		throttle_update = throttle_update - delta
 		if throttle_update < 0 then
 			for unit, targetGUID in pairs(nameplateTargets) do
@@ -3940,6 +3977,7 @@ do
     end
     if not nameplateTargetFrame then
       nameplateTargetFrame = CreateFrame("Frame")
+      nameplateTargetFrame:Hide()
       nameplateTargetFrame:SetScript("OnUpdate", nameplateTargetOnUpdate)
       nameplateTargetFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
       nameplateTargetFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
@@ -4034,14 +4072,19 @@ do
   local inRangeFrame = nil
 
   local function PlayerInRangeUpdate(self, elapsed)
-    Private.StartProfileSystem("generictrigger player in range");
+    if not next(inRangeUnits) then
+      self:SetScript("OnUpdate", nil)
+      return
+    end
     self.elapsed = self.elapsed + elapsed
-    if self.elapsed >= 1.0 then
-      self.elapsed = 0
-      for unit in next, inRangeUnits do
-        if UnitExists(unit) then
-          WeakAuras.ScanUnitEvents("UNIT_IN_RANGE_UPDATE", unit)
-        end
+    if self.elapsed < 1.0 then
+      return
+    end
+    self.elapsed = 0
+    Private.StartProfileSystem("generictrigger player in range");
+    for unit in next, inRangeUnits do
+      if UnitExists(unit) then
+        WeakAuras.ScanUnitEvents("UNIT_IN_RANGE_UPDATE", unit)
       end
     end
     Private.StopProfileSystem("generictrigger player in range");
@@ -4053,7 +4096,9 @@ do
       inRangeFrame.elapsed = 0
       Private.frames["Player In Range Frame"] = inRangeFrame
     end
-    inRangeFrame:SetScript("OnUpdate", PlayerInRangeUpdate)
+    if next(inRangeUnits) then
+      inRangeFrame:SetScript("OnUpdate", PlayerInRangeUpdate)
+    end
   end
 end
 

@@ -176,10 +176,8 @@ end
 
 local updatingAnimations;
 local last_update = GetTime();
+local frame
 local function UpdateAnimations()
-  if not updatingAnimations then
-    return
-  end
   Private.StartProfileSystem("animations");
 
   for groupUid, groupRegion in pairs(pending_controls) do
@@ -195,19 +193,30 @@ local function UpdateAnimations()
     RunAnimation(key, anim, elapsed, time)
   end
 
+  if not next(animations) and not next(pending_controls) then
+    updatingAnimations = nil
+    frame:Hide()
+  end
+
   Private.StopProfileSystem("animations");
 end
 
-local frame = CreateFrame("Frame")
+frame = CreateFrame("Frame")
 Private.frames["WeakAuras Animation Frame"] = frame
+frame:Hide()
 frame:SetScript("OnUpdate", UpdateAnimations)
 
-function Private.RegisterGroupForPositioning(uid, region)
-  pending_controls[uid] = region
+local function EnsureAnimationsUpdating()
   if not updatingAnimations then
     updatingAnimations = true
     last_update = GetTime()
+    frame:Show()
   end
+end
+
+function Private.RegisterGroupForPositioning(uid, region)
+  pending_controls[uid] = region
+  EnsureAnimationsUpdating()
 end
 
 function Private.Animate(namespace, uid, type, anim, region, inverse, onFinished, loop, cloneId)
@@ -400,10 +409,7 @@ function Private.Animate(namespace, uid, type, anim, region, inverse, onFinished
     animation.anim = anim;
     animation.auraUID = uid
 
-    if not(updatingAnimations) then
-      last_update = GetTime()
-      updatingAnimations = true;
-    end
+    EnsureAnimationsUpdating()
     return true;
   else
     if(animations[key]) then

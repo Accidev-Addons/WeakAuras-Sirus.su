@@ -123,6 +123,24 @@ local matchDataByTrigger = {}
 
 local matchDataChanged = {}
 
+local pendingAuraUnits = {}
+local pendingMultiAuraUnits = {}
+local pendingGroupRescan = false
+
+local Buff2Frame
+local multiAuraFrame
+local function RequestBuff2Update()
+  if Buff2Frame then
+    Buff2Frame:Show()
+  end
+end
+
+local function NoteMatchDataChanged(id, triggernum)
+  matchDataChanged[id] = matchDataChanged[id] or {}
+  matchDataChanged[id][triggernum] = true
+  RequestBuff2Update()
+end
+
 local nameplateExists = {}
 
 -- Returns whether a unit id exists. If it exists, the GUID is returned
@@ -239,8 +257,7 @@ local function ScanMatchData(time, triggerInfo, unit, filter)
           local id = triggerInfo.id
           local triggernum = triggerInfo.triggernum
           ReferenceMatchData(id, triggernum, unit, filter, index)
-          matchDataChanged[id] = matchDataChanged[id] or {}
-          matchDataChanged[id][triggernum] = true
+          NoteMatchDataChanged(id, triggernum)
         end
       end
     end
@@ -258,8 +275,7 @@ local function ReferenceMatchDataMulti(matchData, id, triggernum, destGUID)
     local matchDataByTriggerBase = GetOrCreateSubTable(matchDataByTrigger, id, triggernum, destGUID)
     tinsert(matchDataByTriggerBase, matchData)
   end
-  matchDataChanged[id] = matchDataChanged[id] or {}
-  matchDataChanged[id][triggernum] = true
+  NoteMatchDataChanged(id, triggernum)
 end
 
 local function MatchesTriggerInfoMulti(triggerInfo, sourceGUID)
@@ -283,8 +299,7 @@ local function CheckScanFuncs(scanFuncs, unit, filter, key)
         local id = triggerInfo.id
         local triggernum = triggerInfo.triggernum
         ReferenceMatchData(id, triggernum, unit, filter, key)
-        matchDataChanged[id] = matchDataChanged[id] or {}
-        matchDataChanged[id][triggernum] = true
+        NoteMatchDataChanged(id, triggernum)
       end
     end
   end
@@ -429,8 +444,7 @@ local function UpdateMatchData(time, matchDataChanged, unit, key, filter, name, 
           and matchDataByTrigger[id][triggernum][unit][key]
         then
           matchDataByTrigger[id][triggernum][unit][key] = nil
-          matchDataChanged[id] = matchDataChanged[id] or {}
-          matchDataChanged[id][triggernum] = true
+          NoteMatchDataChanged(id, triggernum)
         end
       end
     end
@@ -1540,8 +1554,7 @@ local function UpdateTriggerState(time, id, triggernum)
 end
 
 recheckTriggerInfo = function(triggerInfo)
-  matchDataChanged[triggerInfo.id] = matchDataChanged[triggerInfo.id] or {}
-  matchDataChanged[triggerInfo.id][triggerInfo.triggernum] = true
+  NoteMatchDataChanged(triggerInfo.id, triggerInfo.triggernum)
   triggerInfo.nextScheduledCheckHandle = nil
   triggerInfo.nextScheduledCheck = nil
 end
@@ -1575,8 +1588,7 @@ local function CleanUpOutdatedMatchData(removeIndex, unit, filter)
          for id, triggerData in pairs(data.auras) do
            for triggernum in pairs(triggerData) do
              matchDataByTrigger[id][triggernum][unit][index] = nil
-             matchDataChanged[id] = matchDataChanged[id] or {}
-             matchDataChanged[id][triggernum] = true
+             NoteMatchDataChanged(id, triggernum)
            end
         end
       end
@@ -1596,8 +1608,7 @@ local function CleanUpMatchDataForUnit(unit, filter)
              and matchDataByTrigger[id][triggernum][unit][index]
           then
             matchDataByTrigger[id][triggernum][unit][index] = nil
-            matchDataChanged[id] = matchDataChanged[id] or {}
-            matchDataChanged[id][triggernum] = true
+            NoteMatchDataChanged(id, triggernum)
           end
         end
       end
@@ -1616,8 +1627,7 @@ local function DeactivateScanFuncs(toDeactivate)
           match.auras[id][triggernum] = nil
         end
         matchDataByTrigger[id][triggernum][unit] = nil
-        matchDataChanged[id] = matchDataChanged[id] or {}
-        matchDataChanged[id][triggernum] = true
+        NoteMatchDataChanged(id, triggernum)
       end
     end
   end
@@ -1678,22 +1688,40 @@ local function UpdateStates(matchDataChanged, time)
   end
 end
 
-local function ScanGroupRoleScanFunc(matchDataChanged)
+local function ScanGroupRoleScanFunc()
   for id, idData in pairs(groupRoleScanFunc) do
-    matchDataChanged[id] = matchDataChanged[id] or {}
     for _, triggerInfo in ipairs(idData) do
-      matchDataChanged[id][triggerInfo.triggernum] = true
+      NoteMatchDataChanged(id, triggerInfo.triggernum)
     end
   end
 end
 
-local function ScanRaidMarkScanFunc(matchDataChanged)
+local function ScanRaidMarkScanFunc()
   for id, idData in pairs(raidMarkScanFuncs) do
-    matchDataChanged[id] = matchDataChanged[id] or {}
     for _, triggerInfo in ipairs(idData) do
-      matchDataChanged[id][triggerInfo.triggernum] = true
+      NoteMatchDataChanged(id, triggerInfo.triggernum)
     end
   end
+end
+
+local function FilterHasScanFuncs(nameTbl, spellTbl, generalTbl, filter)
+  return (nameTbl and nameTbl[filter] and next(nameTbl[filter]))
+      or (spellTbl and spellTbl[filter] and next(spellTbl[filter]))
+      or (generalTbl and generalTbl[filter] and next(generalTbl[filter]))
+end
+
+local function UnitIsWatched(unit)
+  if matchData[unit] or unitExistScanFunc[unit] then
+    return true
+  end
+  if FilterHasScanFuncs(scanFuncName[unit], scanFuncSpellId[unit], scanFuncGeneral[unit], "HELPFUL")
+      or FilterHasScanFuncs(scanFuncName[unit], scanFuncSpellId[unit], scanFuncGeneral[unit], "HARMFUL")
+      or FilterHasScanFuncs(scanFuncNameGroup[unit], scanFuncSpellIdGroup[unit], scanFuncGeneralGroup[unit], "HELPFUL")
+      or FilterHasScanFuncs(scanFuncNameGroup[unit], scanFuncSpellIdGroup[unit], scanFuncGeneralGroup[unit], "HARMFUL")
+  then
+    return true
+  end
+  return false
 end
 
 local function ScanGroupUnit(time, matchDataChanged, unitType, unit)
@@ -1703,48 +1731,38 @@ local function ScanGroupUnit(time, matchDataChanged, unitType, unit)
 
     if unitExistScanFunc[unit] then
       for id, idData in pairs(unitExistScanFunc[unit]) do
-        matchDataChanged[id] = matchDataChanged[id] or {}
         for _, triggerInfo in ipairs(idData) do
-          matchDataChanged[id][triggerInfo.triggernum] = true
+          NoteMatchDataChanged(id, triggerInfo.triggernum)
         end
       end
     end
   end
 
-  scanFuncName[unit] = scanFuncName[unit] or {}
-  scanFuncSpellId[unit] = scanFuncSpellId[unit] or {}
-  scanFuncGeneral[unit] = scanFuncGeneral[unit] or {}
-  if unitType then
-    scanFuncNameGroup[unit] = scanFuncNameGroup[unit] or {}
-    scanFuncSpellIdGroup[unit] = scanFuncSpellIdGroup[unit] or {}
-    scanFuncGeneralGroup[unit] = scanFuncGeneralGroup[unit] or {}
+  local nameFuncs = scanFuncName[unit]
+  local spellFuncs = scanFuncSpellId[unit]
+  local generalFuncs = scanFuncGeneral[unit]
+  local nameFuncsGroup = unitType and scanFuncNameGroup[unit]
+  local spellFuncsGroup = unitType and scanFuncSpellIdGroup[unit]
+  local generalFuncsGroup = unitType and scanFuncGeneralGroup[unit]
 
-    ScanUnitWithFilter(matchDataChanged, time, unit, "HELPFUL",
-      scanFuncNameGroup[unit]["HELPFUL"],
-      scanFuncSpellIdGroup[unit]["HELPFUL"],
-      scanFuncGeneralGroup[unit]["HELPFUL"],
-      scanFuncName[unit]["HELPFUL"],
-      scanFuncSpellId[unit]["HELPFUL"],
-      scanFuncGeneral[unit]["HELPFUL"])
-
-    ScanUnitWithFilter(matchDataChanged, time, unit, "HARMFUL",
-      scanFuncNameGroup[unit]["HARMFUL"],
-      scanFuncSpellIdGroup[unit]["HARMFUL"],
-      scanFuncGeneralGroup[unit]["HARMFUL"],
-      scanFuncName[unit]["HARMFUL"],
-      scanFuncSpellId[unit]["HARMFUL"],
-      scanFuncGeneral[unit]["HARMFUL"])
-  else
-    ScanUnitWithFilter(matchDataChanged, time, unit, "HELPFUL", nil, nil, nil,
-      scanFuncName[unit]["HELPFUL"],
-      scanFuncSpellId[unit]["HELPFUL"],
-      scanFuncGeneral[unit]["HELPFUL"])
-
-    ScanUnitWithFilter(matchDataChanged, time, unit, "HARMFUL", nil, nil, nil,
-      scanFuncName[unit]["HARMFUL"],
-      scanFuncSpellId[unit]["HARMFUL"],
-      scanFuncGeneral[unit]["HARMFUL"])
+  local function ScanFilterIfNeeded(filter)
+    local hasFuncs = FilterHasScanFuncs(nameFuncs, spellFuncs, generalFuncs, filter)
+        or FilterHasScanFuncs(nameFuncsGroup, spellFuncsGroup, generalFuncsGroup, filter)
+    local hasStale = matchData[unit] and matchData[unit][filter]
+    if not hasFuncs and not hasStale then
+      return
+    end
+    ScanUnitWithFilter(matchDataChanged, time, unit, filter,
+      nameFuncsGroup and nameFuncsGroup[filter],
+      spellFuncsGroup and spellFuncsGroup[filter],
+      generalFuncsGroup and generalFuncsGroup[filter],
+      nameFuncs and nameFuncs[filter],
+      spellFuncs and spellFuncs[filter],
+      generalFuncs and generalFuncs[filter])
   end
+
+  ScanFilterIfNeeded("HELPFUL")
+  ScanFilterIfNeeded("HARMFUL")
 end
 
 local function UnitToUnitType(unit)
@@ -1839,8 +1857,7 @@ local function RecheckActive(triggerInfo, unit, unitsToRemoveScan)
 
       activeGroupScanFuncs[unit] = activeGroupScanFuncs[unit] or {}
       activeGroupScanFuncs[unit][triggerInfo] = true
-      matchDataChanged[triggerInfo.id] = matchDataChanged[triggerInfo.id] or {}
-      matchDataChanged[triggerInfo.id][triggerInfo.triggernum] = true
+      NoteMatchDataChanged(triggerInfo.id, triggerInfo.triggernum)
     end
   else
     -- Either the unit doesn't exist or the TriggerInfo no longer applies
@@ -1857,8 +1874,7 @@ local function RecheckActive(triggerInfo, unit, unitsToRemoveScan)
         unitsToRemoveScan[unit][triggerInfo] = true
       end
       activeGroupScanFuncs[unit][triggerInfo] = nil
-      matchDataChanged[triggerInfo.id] = matchDataChanged[triggerInfo.id] or {}
-      matchDataChanged[triggerInfo.id][triggerInfo.triggernum] = true
+      NoteMatchDataChanged(triggerInfo.id, triggerInfo.triggernum)
     end
   end
 end
@@ -1871,7 +1887,7 @@ local function RecheckActiveForUnitType(unitType, unit, unitsToRemoveScan)
   end
 end
 
-local Buff2Frame = CreateFrame("Frame")
+Buff2Frame = CreateFrame("Frame")
 Private.frames["WeakAuras Buff2 Frame"] = Buff2Frame
 
 
@@ -1923,16 +1939,8 @@ local function EventHandler(frame, event, arg1, arg2, ...)
       end
     end
   elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
-    for unit in GetAllUnits("group", true, "PlayersAndPets") do
-      RecheckActiveForUnitType("group", unit, deactivatedTriggerInfos)
-      local exists = UnitExistsFixed(unit)
-      if not exists then
-        tinsert(unitsToRemove, unit)
-      else
-        ScanGroupUnit(time, matchDataChanged, "group", unit)
-      end
-    end
-    ScanGroupRoleScanFunc(matchDataChanged)
+    pendingGroupRescan = true
+    RequestBuff2Update()
   elseif event == "UNIT_FLAGS" or event == "UNIT_NAME_UPDATE" or event == "PLAYER_FLAGS_CHANGED" then
     if Private.multiUnitUnits.group[arg1] then
       RecheckActiveForUnitType("group", arg1, deactivatedTriggerInfos)
@@ -1942,7 +1950,10 @@ local function EventHandler(frame, event, arg1, arg2, ...)
       ScanGroupUnit(time, matchDataChanged, nil, "vehicle")
     end
   elseif event == "UNIT_AURA" and arg1 then
-    ScanUnit(time, arg1)
+    if UnitIsWatched(arg1) then
+      pendingAuraUnits[arg1] = true
+      RequestBuff2Update()
+    end
   elseif event == "PLAYER_ENTERING_WORLD" then
     for unit in pairs(matchData) do
       ScanUnit(time, unit)
@@ -1963,7 +1974,7 @@ local function EventHandler(frame, event, arg1, arg2, ...)
     end
 
   elseif event == "RAID_TARGET_UPDATE" then
-    ScanRaidMarkScanFunc(matchDataChanged)
+    ScanRaidMarkScanFunc()
   end
 
   DeactivateScanFuncs(deactivatedTriggerInfos)
@@ -2012,13 +2023,43 @@ end
 Buff2Frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 Buff2Frame:SetScript("OnEvent", EventHandler)
 Buff2Frame.elapsed = 0
+Buff2Frame:Hide()
 Buff2Frame:SetScript("OnUpdate", function(self, elapsed)
   if WeakAuras.IsPaused() then
     return
   end
   Private.StartProfileSystem("bufftrigger2 - OnUpdate")
+  local time = GetTime()
+
+  if pendingGroupRescan then
+    pendingGroupRescan = false
+    local deactivatedTriggerInfos = {}
+    local unitsToRemove = {}
+    for unit in GetAllUnits("group", true, "PlayersAndPets") do
+      RecheckActiveForUnitType("group", unit, deactivatedTriggerInfos)
+      local exists = UnitExistsFixed(unit)
+      if not exists then
+        tinsert(unitsToRemove, unit)
+      else
+        ScanGroupUnit(time, matchDataChanged, "group", unit)
+      end
+    end
+    ScanGroupRoleScanFunc()
+    DeactivateScanFuncs(deactivatedTriggerInfos)
+    for _, unit in ipairs(unitsToRemove) do
+      CleanUpMatchDataForUnit(unit, "HELPFUL")
+      CleanUpMatchDataForUnit(unit, "HARMFUL")
+      matchDataUpToDate[unit] = nil
+    end
+  end
+
+  if next(pendingAuraUnits) then
+    for unit in pairs(pendingAuraUnits) do
+      ScanUnit(time, unit)
+    end
+    wipe(pendingAuraUnits)
+  end
   if next(matchDataChanged) then
-    local time = GetTime()
     UpdateStates(matchDataChanged, time)
     wipe(matchDataChanged)
   end
@@ -2033,6 +2074,8 @@ Buff2Frame:SetScript("OnUpdate", function(self, elapsed)
       end
       DeactivateScanFuncs(deactivatedTriggerInfos)
     end
+  elseif not next(pendingAuraUnits) and not next(matchDataChanged) and not pendingGroupRescan then
+    self:Hide()
   end
   Private.StopProfileSystem("bufftrigger2 - OnUpdate")
 end)
@@ -2119,6 +2162,15 @@ function BuffTrigger.UnloadAll()
   wipe(matchDataMulti)
   wipe(matchDataChanged)
   wipe(activeGroupScanFuncs)
+  wipe(pendingAuraUnits)
+  wipe(pendingMultiAuraUnits)
+  pendingGroupRescan = false
+  if Buff2Frame then
+    Buff2Frame:Hide()
+  end
+  if multiAuraFrame then
+    multiAuraFrame:Hide()
+  end
 end
 
 
@@ -2180,15 +2232,16 @@ local function LoadAura(id, triggernum, triggerInfo)
   if triggerInfo.inRange then
     pollingScanFuncs[id] = pollingScanFuncs[id] or {}
     tinsert(pollingScanFuncs[id], triggerInfo)
+    RequestBuff2Update()
   end
 
   if triggerInfo.ignoreInvisible then
     pollingScanFuncs[id] = pollingScanFuncs[id] or {}
     table.insert(pollingScanFuncs[id], triggerInfo)
+    RequestBuff2Update()
   end
 
-  matchDataChanged[id] = matchDataChanged[id] or {}
-  matchDataChanged[id][triggernum] = true
+  NoteMatchDataChanged(id, triggernum)
 end
 
 function BuffTrigger.LoadDisplays(toLoad)
@@ -3287,7 +3340,6 @@ function Private.ConvertBuffTrigger2(trigger)
 end
 
 -- Multi Target trigger code
-local multiAuraFrame
 local pendingTracks = {}
 
 local unitToGuid = {}
@@ -3354,8 +3406,7 @@ local function RemoveMatchDataMulti(base, destGUID, key, sourceGUID)
         if not next(matchDataByTrigger[id][triggernum][destGUID]) then
           matchDataByTrigger[id][triggernum][destGUID] = nil
         end
-        matchDataChanged[id] = matchDataChanged[id] or {}
-        matchDataChanged[id][triggernum] = true
+        NoteMatchDataChanged(id, triggernum)
       end
     end
     base[key][sourceGUID] = nil
@@ -3659,8 +3710,7 @@ local function CheckAurasMulti(base, unit, filter)
       if changed then
         for id, idData in pairs(base[name][auraCasterGUID].auras) do
           for triggernum in pairs(idData) do
-            matchDataChanged[id] = matchDataChanged[id] or {}
-            matchDataChanged[id][triggernum] = true
+            NoteMatchDataChanged(id, triggernum)
           end
         end
       end
@@ -3670,8 +3720,7 @@ local function CheckAurasMulti(base, unit, filter)
       if changed then
         for id, idData in pairs(base[spellId][auraCasterGUID].auras) do
           for triggernum in pairs(idData) do
-            matchDataChanged[id] = matchDataChanged[id] or {}
-            matchDataChanged[id][triggernum] = true
+            NoteMatchDataChanged(id, triggernum)
           end
         end
       end
@@ -3704,6 +3753,20 @@ function BuffTrigger.InitMultiAura()
     end
     multiAuraFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
     multiAuraFrame:SetScript("OnEvent", BuffTrigger.HandleMultiEvent)
+    multiAuraFrame:Hide()
+    multiAuraFrame:SetScript("OnUpdate", function(self)
+      Private.StartProfileSystem("bufftrigger2 - multi - OnUpdate")
+      for unit, guid in pairs(pendingMultiAuraUnits) do
+        local data = matchDataMulti[guid]
+        if data then
+          CheckAurasMulti(data, unit, "HELPFUL")
+          CheckAurasMulti(data, unit, "HARMFUL")
+        end
+      end
+      wipe(pendingMultiAuraUnits)
+      self:Hide()
+      Private.StopProfileSystem("bufftrigger2 - multi - OnUpdate")
+    end)
     Private.frames["Multi-target 2 Aura Trigger Handler"] = multiAuraFrame
   end
 end
@@ -3726,11 +3789,14 @@ function BuffTrigger.HandleMultiEvent(frame, event, ...)
     ReleaseUID(unit)
   elseif event == "UNIT_AURA" then
     local unit = ...
-    if not unit then return end
+    if not unit then
+      Private.StopProfileSystem(system)
+      return
+    end
     local guid = UnitGUID(unit)
-    if matchDataMulti[guid] then
-      CheckAurasMulti(matchDataMulti[guid], unit, "HELPFUL")
-      CheckAurasMulti(matchDataMulti[guid], unit, "HARMFUL")
+    if guid and matchDataMulti[guid] then
+      pendingMultiAuraUnits[unit] = guid
+      multiAuraFrame:Show()
     end
   elseif event == "PLAYER_LEAVING_WORLD" then
     for GUID, GUIDData in pairs(matchDataMulti) do
@@ -3750,6 +3816,8 @@ function BuffTrigger.HandleMultiEvent(frame, event, ...)
     wipe(pendingTracks)
     wipe(guidToUnit)
     wipe(unitToGuid)
+    wipe(pendingMultiAuraUnits)
+    multiAuraFrame:Hide()
   end
   Private.StopProfileSystem(system)
 end

@@ -20,6 +20,9 @@ local function IsCloseEnough(bar, newValue, targetValue)
   return true;
 end
 
+local smoothFrame = CreateFrame("Frame")
+smoothFrame:Hide()
+
 local function ProcessSmoothStatusBars(self, elapsed)
   for bar, targetValue in pairs(g_updatingBars) do
     local newValue = FrameDeltaLerp(bar:GetValue(), targetValue, 0.25, elapsed);
@@ -31,9 +34,12 @@ local function ProcessSmoothStatusBars(self, elapsed)
       bar:SetValue(newValue);
     end
   end
+  if not next(g_updatingBars) then
+    self:Hide()
+  end
 end
 
-CreateFrame("Frame"):SetScript("OnUpdate", ProcessSmoothStatusBars);
+smoothFrame:SetScript("OnUpdate", ProcessSmoothStatusBars);
 
 Private.SmoothStatusBarMixin = {};
 
@@ -49,6 +55,7 @@ end
 
 function Private.SmoothStatusBarMixin:SetSmoothedValue(value)
   g_updatingBars[self] = value;
+  smoothFrame:Show()
 end
 
 function Private.SmoothStatusBarMixin:SetMinMaxSmoothedValue(min, max)
@@ -62,6 +69,7 @@ function Private.SmoothStatusBarMixin:SetMinMaxSmoothedValue(min, max)
     end
 
     g_updatingBars[self] = targetValue * ratio;
+    smoothFrame:Show()
   end
 
   self.lastSmoothedMin = min;
