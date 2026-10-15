@@ -1575,7 +1575,7 @@ function GenericTrigger.LoadDisplays(toLoad, loadEvent, ...)
     if unitEventProviders[event] then
       unitEventProviders[event]()
     else
-		pcall(frame.RegisterEvent, frame, event)
+		Private.RegisterEventOrCustom(frame, event)
     end
 		genericTriggerRegisteredEvents[event] = true;
 	end
@@ -1590,7 +1590,7 @@ function GenericTrigger.LoadDisplays(toLoad, loadEvent, ...)
         frame.unitFrames[unit].unit = unit
         frame.unitFrames[unit]:SetScript("OnEvent", HandleUnitEvent);
       end
-      pcall(frame.unitFrames[unit].RegisterEvent, frame.unitFrames[unit], event)
+      Private.RegisterUnitEventOrCustom(frame.unitFrames[unit], event, unit)
       end
       genericTriggerRegisteredUnitEvents[unit] = genericTriggerRegisteredUnitEvents[unit] or {};
       genericTriggerRegisteredUnitEvents[unit][event] = true;
@@ -4316,30 +4316,10 @@ do
 end
 
 -- Incoming Resurrection
-do
-  ---@param unit UnitToken
-  ---@return boolean? hasIncomingResurrection
-  function WeakAuras.UnitHasIncomingResurrection(unit)
-    local name = unit and UnitName(unit) or unit
-    return name and WeakAuras.LRC:IsUnitBeingRessed(name)
-  end
-
-  local function ResCommUpdate(event, _, arg2, arg3)
-    Private.StartProfileSystem("generictrigger rescomm")
-    local target = event == "ResComm_ResStart" and arg3 or arg2
-    if target then
-      for unit in pairs(Private.baseUnitId) do
-        if UnitExists(unit) and UnitName(unit) == target then
-          Private.ScanUnitEvents("INCOMING_RESURRECT_CHANGED", unit)
-          Private.ScanEvents("INCOMING_RESURRECT_CHANGED", unit)
-        end
-      end
-    end
-    Private.StopProfileSystem("generictrigger rescomm")
-  end
-
-  WeakAuras.LRC.RegisterCallback(WeakAuras, "ResComm_ResStart", ResCommUpdate)
-  WeakAuras.LRC.RegisterCallback(WeakAuras, "ResComm_ResEnd", ResCommUpdate)
+---@param unit UnitToken
+---@return boolean? hasIncomingResurrection
+function WeakAuras.UnitHasIncomingResurrection(unit)
+  return unit and UnitHasIncomingResurrection(unit)
 end
 
 -- Nameplates

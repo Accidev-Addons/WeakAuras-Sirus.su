@@ -50,10 +50,6 @@ WeakAuras.LGT = LibStub("LibGroupTalents-1.0", true) or {
   UnitHasTalent = function(_, _) end,
   UnitHasGlyph = function(_, _) end,
 }
-WeakAuras.LRC = LibStub("LibResComm-1.0", true) or {
-  RegisterCallback = function(_, _, _) end,
-  IsUnitBeingRessed = function(_) end,
-}
 
 Private.maxTimerDuration = 604800; -- A week, in seconds
 
@@ -5845,7 +5841,7 @@ local function GetAnchorFrame(data, region, parent)
       Private.ensurePRDFrame()
       personalRessourceDisplayFrame:anchorFrame(id, anchorFrameType)
       return personalRessourceDisplayFrame
-    elseif not WeakAuras.IsAwesomeEnabled() then
+    else
       return WeakAuras.HiddenFrames
     end
   end

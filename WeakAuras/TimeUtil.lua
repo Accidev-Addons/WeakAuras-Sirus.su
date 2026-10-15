@@ -570,15 +570,11 @@ do
     AbbreviateNumbers = AbbreviateNumbers,
   }
 
-  local _G = _G
   for name, value in pairs(exports) do
     if value then
       Private[name] = value
       Private.AuraEnvOverrides = Private.AuraEnvOverrides or {}
       Private.AuraEnvOverrides[name] = value
-      if not _G[name] then
-        _G[name] = value
-      end
     end
   end
 end

@@ -2,8 +2,12 @@ local AddonName, TemplatePrivate = ...
 local WeakAuras = WeakAuras
 if not WeakAuras.IsSirusVersion() then return end
 local L = WeakAuras.L
-local GetSpellInfo, tinsert, GetItemInfo, GetSpellDescription, C_Timer, Spell
-    = GetSpellInfo, tinsert, GetItemInfo, GetSpellDescription, C_Timer, Spell
+local GetSpellInfo, tinsert, GetItemInfo, GetSpellDescription, C_Timer
+    = GetSpellInfo, tinsert, GetItemInfo, GetSpellDescription, C_Timer
+
+local function GetSpellIcon(spellID)
+  return (select(3, GetSpellInfo(spellID)))
+end
 -- The templates tables are created on demand
 local templates =
   {
@@ -35,7 +39,7 @@ local templates =
     },
     general = {
       title = L["General"],
-      icon = C_Spell.GetSpellIcon(49238),
+      icon = GetSpellIcon(49238),
       args = {}
     },
   }
@@ -73,7 +77,7 @@ templates.class.WARRIOR = {
         { spell = 23920, type = "buff", unit = "player"}, -- Spell Reflection
         { spell = 46913, type = "buff", unit = "player"}, -- Bloodsurge
       },
-      icon = C_Spell.GetSpellIcon(2565)
+      icon = GetSpellIcon(2565)
     },
     [2] = {
       title = L["Debuffs"],
@@ -92,7 +96,7 @@ templates.class.WARRIOR = {
         { spell = 12797, type = "debuff", unit = "target"}, -- Improved Revenge
         { spell = 12809, type = "debuff", unit = "target"}, -- Concussion Blow
       },
-      icon = C_Spell.GetSpellIcon(12809)
+      icon = GetSpellIcon(12809)
     },
     [3] = {
       title = L["Abilities"],
@@ -145,7 +149,7 @@ templates.class.WARRIOR = {
         { spell = 60970, type = "ability", talent = 65}, -- Heroic Fury
         { spell = 64382, type = "ability", requiresTarget = true, debuff = true, form = 1}, -- Shattering Throw
       },
-      icon = C_Spell.GetSpellIcon(64382)
+      icon = GetSpellIcon(64382)
     },
     [4] = {},
     [5] = {},
@@ -171,14 +175,14 @@ templates.class.PALADIN = {
         { spell = 1044, type = "buff", unit = "group"}, -- Blessing of Freedom
         { spell = 6940, type = "buff", unit = "group"}, -- Blessing of Sacrifice
       },
-      icon = C_Spell.GetSpellIcon(6940)
+      icon = GetSpellIcon(6940)
     },
     [2] = {
       title = L["Debuffs"],
       args = {
         { spell = 853, type = "debuff", unit = "target"}, -- Hammer of Justice
       },
-      icon = C_Spell.GetSpellIcon(853)
+      icon = GetSpellIcon(853)
     },
     [3] = {
       title = L["Abilities"],
@@ -221,7 +225,7 @@ templates.class.PALADIN = {
         { spell = 53595, type = "ability", talent = 61}, -- Hammer of the Righteous
         -- { spell = 348704, type = "ability", buff = true}, -- Seal of Vengeance
       },
-      icon = C_Spell.GetSpellIcon(53595)
+      icon = GetSpellIcon(53595)
     },
     [4] = {},
     [5] = {},
@@ -248,7 +252,7 @@ templates.class.HUNTER = {
         { spell = 19621, type = "buff", unit = "pet"}, -- Frenzy
         { spell = 24450, type = "buff", unit = "pet"}, -- Prowl
       },
-      icon = C_Spell.GetSpellIcon(24450)
+      icon = GetSpellIcon(24450)
     },
     [2] = {
       title = L["Debuffs"],
@@ -264,7 +268,7 @@ templates.class.HUNTER = {
         { spell = 5116, type = "debuff", unit = "target"}, -- Concussive Shot
         { spell = 24394, type = "debuff", unit = "target"}, -- Intimidation
       },
-      icon = C_Spell.GetSpellIcon(24394)
+      icon = GetSpellIcon(24394)
     },
     [3] = {
       title = L["Abilities"],
@@ -309,7 +313,7 @@ templates.class.HUNTER = {
         { spell = 53301, type = "ability", requiresTarget = true, talent = 106}, -- Explosive Shot
         { spell = 53351, type = "ability", requiresTarget = true, usable = true}, -- Kill Shot
       },
-      icon = C_Spell.GetSpellIcon(53351)
+      icon = GetSpellIcon(53351)
     },
     [4] = {},
     [5] = {},
@@ -338,7 +342,7 @@ templates.class.ROGUE = {
         { spell = 14149, type = "buff", unit = "player"}, -- Remorseless
         { spell = 14278, type = "buff", unit = "player"}, -- Ghostly Strike
       },
-      icon = C_Spell.GetSpellIcon(14278)
+      icon = GetSpellIcon(14278)
     },
     [2] = {
       title = L["Debuffs"],
@@ -351,7 +355,7 @@ templates.class.ROGUE = {
         { spell = 17348, type = "debuff", unit = "target"}, -- Hemorrhage
         { spell = 14183, type = "debuff", unit = "target"}, -- Premeditation
       },
-      icon = C_Spell.GetSpellIcon(14183)
+      icon = GetSpellIcon(14183)
     },
     [3] = {
       title = L["Abilities"],
@@ -390,7 +394,7 @@ templates.class.ROGUE = {
         { spell = 51723, type = "ability"}, -- Fan of Knives
         { spell = 57934, type = "ability", buff = true}, -- Tricks of the Trade
       },
-      icon = C_Spell.GetSpellIcon(57934)
+      icon = GetSpellIcon(57934)
     },
     [4] = {},
     [5] = {},
@@ -416,7 +420,7 @@ templates.class.PRIEST = {
         { spell = 2096, type = "buff", unit = "player"}, -- Mind Vision
         { spell = 1706, type = "buff", unit = "player"}, -- Levitate
       },
-      icon = C_Spell.GetSpellIcon(1706)
+      icon = GetSpellIcon(1706)
     },
     [2] = {
       title = L["Debuffs"],
@@ -427,7 +431,7 @@ templates.class.PRIEST = {
         { spell = 9484, type = "debuff", unit = "multi" }, -- Shackle Undead
         { spell = 34914, type = "debuff", unit = "target", talent = 101}, -- Vampiric Touch
       },
-      icon = C_Spell.GetSpellIcon(34914)
+      icon = GetSpellIcon(34914)
     },
     [3] = {
       title = L["Abilities"],
@@ -466,7 +470,7 @@ templates.class.PRIEST = {
         { spell = 64843, type = "ability"}, -- Divine Hymn
         { spell = 64901, type = "ability"}, -- Hymn of Hope
       },
-      icon = C_Spell.GetSpellIcon(64901)
+      icon = GetSpellIcon(64901)
     },
     [4] = {},
     [5] = {},
@@ -489,14 +493,14 @@ templates.class.SHAMAN = {
         { spell = 546, type = "buff", unit = "player"}, -- Water Walking
         { spell = 16256, type = "buff", unit = "player", talent = 51}, -- Flurry
       },
-      icon = C_Spell.GetSpellIcon(16256)
+      icon = GetSpellIcon(16256)
     },
     [2] = {
       title = L["Debuffs"],
       args = {
         { spell = 3600, type = "debuff", unit = "target"}, -- Earthbind
       },
-      icon = C_Spell.GetSpellIcon(3600)
+      icon = GetSpellIcon(3600)
     },
     [3] = {
       title = L["Abilities"],
@@ -560,7 +564,7 @@ templates.class.SHAMAN = {
         { spell = 51533, type = "ability", buff = true, talent = 65}, -- Feral Spirit
         { spell = 61295, type = "ability", talent = 105}, -- Riptide
       },
-      icon = C_Spell.GetSpellIcon(61295)
+      icon = GetSpellIcon(61295)
 
     },
     [4] = {},
@@ -592,7 +596,7 @@ templates.class.MAGE = {
         { spell = 12536, type = "buff", unit = "player"}, -- Clearcasting
         { spell = 45438, type = "buff", unit = "player"}, -- Ice Block
       },
-      icon = C_Spell.GetSpellIcon(45438)
+      icon = GetSpellIcon(45438)
     },
     [2] = {
       title = L["Debuffs"],
@@ -603,7 +607,7 @@ templates.class.MAGE = {
         { spell = 11103, type = "debuff", unit = "target"}, -- Impact
         { spell = 11180, type = "debuff", unit = "target"}, -- Winter's Chill
       },
-      icon = C_Spell.GetSpellIcon(11180)
+      icon = GetSpellIcon(11180)
     },
     [3] = {
       title = L["Abilities"],
@@ -651,7 +655,7 @@ templates.class.MAGE = {
         { spell = 44425, type = "ability", requiresTarget = true, talent = 27}, -- Arcane Barrage
         { spell = 44572, type = "ability", requiresTarget = true, debuff = true, usable = true, talent = 107}, -- Deep Freeze
       },
-      icon = C_Spell.GetSpellIcon(44572)
+      icon = GetSpellIcon(44572)
     },
     [4] = {},
     [5] = {},
@@ -681,7 +685,7 @@ templates.class.WARLOCK = {
         { spell = 19028, type = "buff", unit = "player", talent = 59}, -- Soul Link
         { spell = 20707, type = "buff", unit = "group"}, -- Soulstone
       },
-      icon = C_Spell.GetSpellIcon(20707)
+      icon = GetSpellIcon(20707)
     },
     [2] = {
       title = L["Debuffs"],
@@ -705,7 +709,7 @@ templates.class.WARLOCK = {
         { spell = 30108, type = "debuff", unit = "target", talent = 21}, -- Unstable Affliction
         { spell = 48181, type = "debuff", unit = "target", talent = 26}, -- Haunt
       },
-      icon = C_Spell.GetSpellIcon(48181)
+      icon = GetSpellIcon(48181)
     },
     [3] = {
       title = L["Abilities"],
@@ -743,7 +747,7 @@ templates.class.WARLOCK = {
         { spell = 47897, type = "ability"}, -- Shadowflame
         { spell = 48020, type = "ability"}, -- Demonic Circle: Teleport
       },
-      icon = C_Spell.GetSpellIcon(48020)
+      icon = GetSpellIcon(48020)
     },
     [4] = {},
     [5] = {},
@@ -774,7 +778,7 @@ templates.class.DRUID = {
         { spell = 29166, type = "buff", unit = "group"}, -- Innervate
         { spell = 33763, type = "buff", unit = "player"}, -- Lifebloom
       },
-      icon = C_Spell.GetSpellIcon(33763)
+      icon = GetSpellIcon(33763)
     },
     [2] = {
       title = L["Debuffs"],
@@ -788,7 +792,7 @@ templates.class.DRUID = {
         { spell = 5570, type = "debuff", unit = "target", talent = 8}, -- Insect Swarm
         { spell = 8921, type = "debuff", unit = "target"}, -- Moonfire
       },
-      icon = C_Spell.GetSpellIcon(8921)
+      icon = GetSpellIcon(8921)
     },
     [3] = {
       title = L["Abilities"],
@@ -845,7 +849,7 @@ templates.class.DRUID = {
         { spell = 48505, type = "ability", talent = 24}, -- Starfall
         { spell = 50334, type = "ability", buff = true, talent = 67}, -- Berserk
       },
-      icon = C_Spell.GetSpellIcon(50334)
+      icon = GetSpellIcon(50334)
     },
     [4] = {},
     [5] = {},
@@ -883,7 +887,7 @@ templates.class.DEATHKNIGHT = {
         { spell = 59052, type = "buff", unit = "player"}, -- Rime
         { spell = 66799, type = "buff", unit = "player", talent = 79}, -- Desolation
       },
-      icon = C_Spell.GetSpellIcon(66799)
+      icon = GetSpellIcon(66799)
     },
     [2] = {
       title = L["Debuffs"],
@@ -899,7 +903,7 @@ templates.class.DEATHKNIGHT = {
         { spell = 56222, type = "debuff", unit = "target"}, -- Dark Command
         { spell = 59879, type = "debuff", unit = "target"}, -- Blood Plague
       },
-      icon = C_Spell.GetSpellIcon(59879)
+      icon = GetSpellIcon(59879)
     },
     [3] = {
       title = L["Abilities"],
@@ -933,7 +937,7 @@ templates.class.DEATHKNIGHT = {
         { spell = 66198, type = "ability", requiresTarget = true}, -- Obliterate
         { spell = 322772, type = "ability",requiresTarget = true, talent = 16}, -- sirus new bdk spell
       },
-      icon = C_Spell.GetSpellIcon(66198)
+      icon = GetSpellIcon(66198)
     },
     [4] = {},
     [5] = {},
@@ -956,7 +960,7 @@ tinsert(templates.general.args, {
 });
 tinsert(templates.general.args, {
   title = L["Cast"],
-  icon = C_Spell.GetSpellIcon((131)),
+  icon = GetSpellIcon((131)),
   type = "cast"
 });
 tinsert(templates.general.args, {
@@ -1247,12 +1251,6 @@ local function handleItem(item)
       end
     end
     if (item.type ~= "item") then
-      local spell = Spell:CreateFromSpellID(item.spell);
-      if (not spell:IsSpellEmpty()) then
-        spell:ContinueOnSpellLoad(function()
-          item.description = GetSpellInfo(spell:GetSpellID());
-        end);
-      end
       item.description = "";
     end
   end
@@ -1359,9 +1357,9 @@ local function enrichDatabase()
   end
 
   if (waitingForItemInfo) then
-    itemInfoReceived:RegisterEvent("GET_ITEM_INFO_RECEIVED");
+    itemInfoReceived:RegisterCustomEvent("GET_ITEM_INFO_RECEIVED");
   else
-    itemInfoReceived:UnregisterEvent("GET_ITEM_INFO_RECEIVED");
+    itemInfoReceived:UnregisterCustomEvent("GET_ITEM_INFO_RECEIVED");
   end
 end
 

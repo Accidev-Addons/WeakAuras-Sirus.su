@@ -55,44 +55,10 @@ end
 
 -- UTF-8 Sub is pretty commonly needed
 local WA_Utf8Sub = function(input, size)
-  local output = ""
-  input = tostring(input)
-  if type(input) ~= "string" then
-    return output
+  if size < 1 then
+    return ""
   end
-  local i = 1
-  while (size > 0) do
-    local byte = input:byte(i)
-    if not byte then
-      return output
-    end
-    if byte < 128 then
-      -- ASCII byte
-      output = output .. input:sub(i, i)
-      size = size - 1
-    elseif byte < 192 then
-      -- Continuation bytes
-      output = output .. input:sub(i, i)
-    elseif byte < 244 then
-      -- Start bytes
-      output = output .. input:sub(i, i)
-      size = size - 1
-    end
-    i = i + 1
-  end
-
-  -- Add any bytes that are part of the sequence
-  while (true) do
-    local byte = input:byte(i)
-    if byte and byte >= 128 and byte < 192 then
-      output = output .. input:sub(i, i)
-    else
-      break
-    end
-    i = i + 1
-  end
-
-  return output
+  return utf8.sub(tostring(input), 1, size)
 end
 
 WeakAuras.WA_Utf8Sub = WA_Utf8Sub
@@ -109,7 +75,8 @@ local WA_ClassColorName = function(unit, maxlen)
       return name
     else
       local classData = (CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS)[class]
-      local coloredName = ("|c%s%s|r"):format(classData.colorStr, name)
+      local colorStr = classData and classData.colorStr or select(4, GetClassColor(class))
+      local coloredName = ("|c%s%s|r"):format(colorStr, name)
       return coloredName
     end
   else
@@ -146,11 +113,12 @@ WeakAuras.HideOverlayGlow = LCG.ButtonGlow_Stop
 local LGF = LibStub("LibGetFrame-1.0")
 WeakAuras.GetUnitFrame = LGF.GetUnitFrame
 WeakAuras.GetUnitNameplate = function(unit, ...)
-  if WeakAuras.IsAwesomeEnabled() and Private.multiUnitUnits.nameplate[unit] then
-    return LGF.GetUnitNameplate(unit) or Private.GetUnitNameplate(unit, ...)
-  else
-    return Private.GetUnitNameplate(unit, ...)
+  local plate = unit and C_NamePlate.GetNamePlateForUnit(unit)
+  local elvui = plate and plate.ElvUIFrame
+  if elvui and elvui.Health then
+    return elvui.Health
   end
+  return plate and LGF.GetUnitNameplate(unit) or Private.GetUnitNameplate(unit, ...)
 end
 -- ! deprecated
 WeakAuras.GetNamePlateForUnit = WeakAuras.GetUnitNameplate

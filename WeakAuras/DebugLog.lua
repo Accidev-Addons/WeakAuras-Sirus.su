@@ -29,6 +29,19 @@ Private.DebugLog = {
   GetLogs = function(uid) end
 }
 
+local function dumpTable(log, tbl, indent, seen)
+  for k, v in pairs(tbl) do
+    if type(v) == "table" and not seen[v] and #indent < 10 then
+      seen[v] = true
+      tinsert(log, indent .. tostring(k) .. " = {")
+      dumpTable(log, v, indent .. "  ", seen)
+      tinsert(log, indent .. "}")
+    else
+      tinsert(log, indent .. tostring(k) .. " = " .. tostring(v))
+    end
+  end
+end
+
 local function serialize(log, input)
   if type(input) == "table" then
     if log[#log] == "" then
@@ -36,14 +49,7 @@ local function serialize(log, input)
     else
       tinsert(log, L["Dumping table"])
     end
-    -- Use dump to create a table dump, because that already handles depth limitation
-    -- and cycles and looks nice
-    -- But this requires temporarily setting DEFAULT_CHAT_FRAME
-    -- Nothing can go wrong with that.
-    local defaultChatFrame = _G.DEFAULT_CHAT_FRAME
-    _G.DEFAULT_CHAT_FRAME = log
-    DevTools_Dump(input)
-    _G.DEFAULT_CHAT_FRAME = defaultChatFrame
+    dumpTable(log, input, "  ", { [input] = true })
     tinsert(log, "")
   else
     if log[#log] == "" then

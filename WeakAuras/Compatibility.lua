@@ -235,6 +235,20 @@ Private.C_FunctionContainers = C_FunctionContainers
 Private.C_Timer = C_Timer
 Private.RunNextFrame = RunNextFrame
 
+function Private.RegisterEventOrCustom(frame, event)
+  pcall(frame.RegisterEvent, frame, event)
+  if not frame:IsEventRegistered(event) then
+    frame:RegisterCustomEvent(event)
+  end
+end
+
+function Private.RegisterUnitEventOrCustom(frame, event, unit)
+  pcall(frame.RegisterUnitEvent, frame, event, unit)
+  if not frame:IsEventRegistered(event) then
+    Private.RegisterEventOrCustom(frame, event)
+  end
+end
+
 local function SafePack(...)
   local tbl = { ... }
   tbl.n = select("#", ...)
@@ -472,14 +486,10 @@ do
     FrameDeltaLerp = FrameDeltaLerp,
   }
 
-  local _G = _G
   for name, value in pairs(exports) do
     Private[name] = value
     Private.AuraEnvOverrides = Private.AuraEnvOverrides or {}
     Private.AuraEnvOverrides[name] = value
-    if not _G[name] then
-      _G[name] = value
-    end
   end
 end
 

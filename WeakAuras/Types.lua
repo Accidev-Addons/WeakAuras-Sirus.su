@@ -20,7 +20,7 @@ local function WA_GetClassColor(classFilename)
     return color.colorStr
   end
 
-  return "ffffffff"
+  return (select(4, GetClassColor(classFilename)))
 end
 
 ---@type table<string, string>
@@ -1291,24 +1291,18 @@ Private.unit_threat_situation_types = {
 }
 
 WeakAuras.class_types = {}
-for i, class in ipairs(CLASS_SORT_ORDER) do
-  WeakAuras.class_types[class] = WrapTextInColorCode(LOCALIZED_CLASS_NAMES_MALE[class], WA_GetClassColor(class))
+for i = 1, GetNumClasses() do
+  local className, class = GetClassInfo(i)
+  if class then
+    WeakAuras.class_types[class] = WrapTextInColorCode(className, WA_GetClassColor(class))
+  end
 end
 
--- Extract Race names from faction IDs
 WeakAuras.race_types = {}
-do
-  local race_ids = {
-    [1]="Human", [2]="Orc", [3]="Dwarf", [4]="NightElf", [5]="Undead",
-    [6]="Tauren", [8]="Gnome", [9]="Troll", [914]="BloodElf", [927]="Draenei",
-  }
-  for id, key in pairs(race_ids) do
-    local raw = GetFactionInfoByID(id)
-    local name = type(raw) == "string"
-              and (raw:match("^[^,:]*[,:](.+)$") or raw)
-              :match("^%s*(.-)%s*$")
-              or key
-    WeakAuras.race_types[key] = (name == "" and key) or name
+for raceID = 1, E_CHARACTER_RACES.RACE_EREDAR do
+  local _, race, name = C_CreatureInfo.GetRaceInfoEx(raceID)
+  if race and not WeakAuras.race_types[race] then
+    WeakAuras.race_types[race] = name and name:gsub("%s*%([^%)]+%)", "") or race
   end
 end
 
@@ -1316,7 +1310,8 @@ end
 Private.faction_group = {
   Alliance = L["Alliance"],
   Horde = L["Horde"],
-  Neutral = L["Neutral"]
+  Neutral = L["Neutral"],
+  Renegade = FACTION_RENEGADE
 }
 
 ---@type table<number, string>
