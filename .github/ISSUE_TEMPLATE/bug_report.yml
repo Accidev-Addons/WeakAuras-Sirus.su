@@ -43,16 +43,7 @@ body:
     description: In which language do you play World of Warcraft?
     options:
       - enGB/enUS
-      - deDE
-      - frFR
-      - itIT
-      - esES
-      - esMX
-      - koKR
-      - ptBR
       - ruRU
-      - zhCN
-      - zhTW
   validations:
     required: true
 
