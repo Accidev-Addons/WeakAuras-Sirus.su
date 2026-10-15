@@ -1312,6 +1312,12 @@ Private.faction_group = {
 }
 
 ---@type table<number, string>
+Private.constellation_type = {}
+for spellID, raceID in pairs(ZODIAC_DEBUFFS) do
+  Private.constellation_type[spellID] = select(2, C_ZodiacSign.GetZodiacSignInfo(raceID))
+end
+
+---@type table<number, string>
 Private.form_types = {};
 local function update_forms()
   local oldForms = Private.form_types

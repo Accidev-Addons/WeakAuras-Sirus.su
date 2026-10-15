@@ -1723,7 +1723,7 @@ function WeakAuras.CreateTemplateView(Private, frame)
       local raceHeader = AceGUI:Create("Heading");
       raceHeader:SetFullWidth(true);
       newViewScroll:AddChild(raceHeader);
-      local raceSelector = createDropdown("race", WeakAuras.race_types);
+      local raceSelector = createDropdown("race", TemplatePrivate.zodiacSigns or WeakAuras.race_types);
       newViewScroll:AddChild(raceSelector);
       newViewScroll:AddChild(createSpacer());
       if (TemplatePrivate.triggerTemplates.race[newView.race]) then
@@ -1876,7 +1876,8 @@ function WeakAuras.CreateTemplateView(Private, frame)
     end
     newView.class = select(2, UnitClass("player"));
     newView.spec = math.max(C_Talent.GetCurrentSpecTabIndex(), 1)
-    newView.race = select(2, UnitRace('player'));
+    local sign = WeakAuras.GetCurrentConstellation()
+    newView.race = sign and select(2, C_CreatureInfo.GetRaceInfoEx(ZODIAC_DEBUFFS[sign])) or select(2, UnitRace('player'));
 
     createButtons();
   end
