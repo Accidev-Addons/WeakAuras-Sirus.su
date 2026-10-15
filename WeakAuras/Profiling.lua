@@ -10,7 +10,7 @@ local Private = select(2, ...)
 local WeakAuras = WeakAuras
 local L = WeakAuras.L
 local prettyPrint = WeakAuras.prettyPrint
-local LGF = LibStub("LibGetFrame-1.0")
+local LGF = LibStub("LibGetFrame-1.1")
 
 local profileData = {}
 profileData.systems = {}

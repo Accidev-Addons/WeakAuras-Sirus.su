@@ -1,4 +1,4 @@
-local MAJOR_VERSION = "LibGetFrame-1.0"
+local MAJOR_VERSION = "LibGetFrame-1.1"
 local MINOR_VERSION = 76
 if not LibStub then
   error(MAJOR_VERSION .. " requires LibStub.")
@@ -549,13 +549,42 @@ function lib.ScanForUnitFrames()
   ScanForUnitFrames(true)
 end
 
+local filterCache = setmetatable({}, { __mode = "k" })
 local function isFrameFiltered(name, ignoredFrames)
+  local cache = filterCache[ignoredFrames]
+  if cache and cache[name] ~= nil then
+    return cache[name]
+  end
+  local filtered = false
   for _, filter in pairs(ignoredFrames) do
     if name:find(filter) then
-      return true
+      filtered = true
+      break
     end
   end
-  return false
+  if cache then
+    cache[name] = filtered
+  end
+  return filtered
+end
+
+local priorityCache = setmetatable({ [defaultFramePriorities] = {} }, { __mode = "k" })
+local function getFramePriority(name, framePriorities)
+  local cache = priorityCache[framePriorities]
+  if cache and cache[name] then
+    return cache[name]
+  end
+  local index = #framePriorities + 1
+  for i = 1, #framePriorities do
+    if name:find(framePriorities[i]) then
+      index = i
+      break
+    end
+  end
+  if cache then
+    cache[name] = index
+  end
+  return index
 end
 
 local function GetUnitFrames(target, ignoredFrames)
@@ -695,21 +724,7 @@ local function Init(noDelay)
   ScanForUnitFrames(noDelay)
 end
 
-function lib.GetUnitFrame(target, opt)
-  if type(GetFramesCacheListener) ~= "table" then
-    Init(true)
-  end
-  local defaultOpt
-  if not opt then
-    opt = {}
-    defaultOpt = true
-  end
-  setmetatable(opt, { __index = defaultOptions })
-
-  if not target then
-    return
-  end
-
+local function buildIgnoredFrames(target, opt, defaultOpt)
   local ignoredFrames = CopyTable(opt.ignoreFrames)
   if opt.ignorePlayerFrame then
     for _, v in pairs(opt.playerFrames) do
@@ -751,6 +766,38 @@ function lib.GetUnitFrame(target, opt)
       tinsert(ignoredFrames, v)
     end
   end
+  return ignoredFrames
+end
+
+local defaultIgnoredFrames = {}
+function lib.GetUnitFrame(target, opt)
+  if type(GetFramesCacheListener) ~= "table" then
+    Init(true)
+  end
+  local defaultOpt
+  if not opt then
+    opt = defaultOptions
+    defaultOpt = true
+  else
+    setmetatable(opt, { __index = defaultOptions })
+  end
+
+  if not target then
+    return
+  end
+
+  local ignoredFrames
+  if defaultOpt then
+    local key = (target == "target" or target == "targettarget" or target == "focus") and target or ""
+    ignoredFrames = defaultIgnoredFrames[key]
+    if not ignoredFrames then
+      ignoredFrames = buildIgnoredFrames(target, opt, defaultOpt)
+      defaultIgnoredFrames[key] = ignoredFrames
+      filterCache[ignoredFrames] = {}
+    end
+  else
+    ignoredFrames = buildIgnoredFrames(target, opt, defaultOpt)
+  end
 
   local frames = GetUnitFrames(target, ignoredFrames)
 
@@ -763,15 +810,14 @@ function lib.GetUnitFrame(target, opt)
   end
 
   if not opt.returnAll then
-    for i = 1, #opt.framePriorities do
-      for frame, frameName in pairs(frames) do
-        if frameName:find(opt.framePriorities[i]) then
-          return ElvuiWorkaround(frame)
-        end
+    local best, bestPriority
+    for frame, frameName in pairs(frames) do
+      local priority = getFramePriority(frameName, opt.framePriorities)
+      if not bestPriority or priority < bestPriority then
+        best, bestPriority = frame, priority
       end
     end
-    local next = next
-    return ElvuiWorkaround(next(frames))
+    return ElvuiWorkaround(best)
   else
     for frame in pairs(frames) do
       frames[frame] = ElvuiWorkaround(frame)

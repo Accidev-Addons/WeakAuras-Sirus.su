@@ -342,7 +342,7 @@ Private.frames = {}
 --- @field PixelGlow_Start fun(frame: Frame)
 --- @field PixelGlow_Stop fun(frame: Frame)
 
---- @class LibGetFrame-1.0
+--- @class LibGetFrame-1.1
 --- @field GetUnitFrame fun(unit: string)
 --- @field GetUnitNameplate fun(unit: string)
 --- @field StartProfile fun()
@@ -443,7 +443,7 @@ do
     "SpellRange-1.0",
     "LibCustomGlow-1.0",
     "LibDBIcon-1.0",
-    "LibGetFrame-1.0",
+    "LibGetFrame-1.1",
     "LibSerialize",
     "LibGroupTalents-1.0",
   }

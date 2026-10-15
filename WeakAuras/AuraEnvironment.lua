@@ -110,7 +110,7 @@ local LCG = LibStub("LibCustomGlow-1.0")
 WeakAuras.ShowOverlayGlow = LCG.ButtonGlow_Start
 WeakAuras.HideOverlayGlow = LCG.ButtonGlow_Stop
 
-local LGF = LibStub("LibGetFrame-1.0")
+local LGF = LibStub("LibGetFrame-1.1")
 WeakAuras.GetUnitFrame = LGF.GetUnitFrame
 WeakAuras.GetUnitNameplate = function(unit, ...)
   local plate = unit and C_NamePlate.GetNamePlateForUnit(unit)
