@@ -1758,7 +1758,7 @@ unitLoadFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
 
 local talentGroup, talentPoints1, talentPoints2, talentPoints3
 local function TalentsChanged()
-  local group = C_Talent.GetActiveTalentGroup()
+  local group = C_GlobalStorage.GetVar("ASMSG_SPEC_INFO") and C_Talent.GetActiveTalentGroup() or 1
   local _, _, points1 = GetTalentTabInfo(1)
   local _, _, points2 = GetTalentTabInfo(2)
   local _, _, points3 = GetTalentTabInfo(3)
