@@ -27,18 +27,18 @@ Example Usage:
 	end
 ]]
 
-local MAJOR, MINOR = "LibTalentQuery-1.0", 90000 + tonumber(("$Rev: 84 $"):match("(%d+)"))
+local MAJOR, MINOR = "LibTalentQuery-1.0", 100086
 
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
 local INSPECTDELAY = 1
 local INSPECTTIMEOUT = 5
+local RETRYCOOLDOWN = 30
 if not lib.events then
 	lib.events = LibStub("CallbackHandler-1.0"):New(lib)
 end
 
-local validateTrees
 local enteredWorld = IsLoggedIn()
 local frame = lib.frame
 if not frame then
@@ -70,11 +70,14 @@ local inspectQueue = lib.inspectQueue or {}
 lib.inspectQueue = inspectQueue
 local garbageQueue = lib.garbageQueue or {}	-- Added a second queue to things. Inspects that initially fail are now
 lib.garbageQueue = garbageQueue				-- thrown into second queue will will be processed once main queue is empty
+local retryCooldown = lib.retryCooldown or {}
+lib.retryCooldown = retryCooldown
 
-if next(inspectQueue) then
+if next(inspectQueue) or next(garbageQueue) then
 	frame:Show()
 end
 
+local wipe = _G.wipe
 local UnitIsPlayer = _G.UnitIsPlayer
 local UnitName = _G.UnitName
 local UnitExists = _G.UnitExists
@@ -157,9 +160,10 @@ function lib:Query(unit)
 			error(("Bad argument #2 to 'Query'. %q does not require a server query before reading talents"):format("player"), 2)
 		else
 			local name = UnitFullName(unit)
-			if (not inspectQueue[name]) then
+			if (not inspectQueue[name] and (not retryCooldown[name] or retryCooldown[name] < GetTime())) then
 				inspectQueue[name] = UnitGUID(unit)
 				garbageQueue[name] = nil
+				retryCooldown[name] = nil
 			end
 			frame:Show()
 		end
@@ -189,10 +193,9 @@ function lib:CheckInspectQueue()
 	if (self.lastQueuedInspectReceived and self.lastQueuedInspectReceived < GetTime() - 60) then
 		-- No queued results received for a minute, so purge the queue as invalid and move on with our lives
 		self.lastQueuedInspectReceived = nil
-		inspectQueue = {}
-		lib.inspectQueue = inspectQueue
-		garbageQueue = {}
-		lib.garbageQueue = garbageQueue
+		wipe(inspectQueue)
+		wipe(garbageQueue)
+		wipe(retryCooldown)
 		frame:Hide()
 		return
 	end
@@ -206,20 +209,34 @@ function lib:CheckInspectQueue()
 				NotifyInspect(unit)
 				break
 			else
-				garbageQueue[name] = guid	-- Not available, throw into secondary queue and continue
+				retryCooldown[name] = GetTime() + RETRYCOOLDOWN
+				garbageQueue[name] = guid
 				inspectQueue[name] = nil
 			end
 		end
 	end
 
 	if (not next(inspectQueue)) then
-		if (next(garbageQueue)) then
-			-- Retry initially failed inspects
-			lib.inspectQueue = garbageQueue
-			inspectQueue = lib.inspectQueue
-			lib.garbageQueue = {}
-			garbageQueue = lib.garbageQueue
-		else
+		local now = GetTime()
+		for name,when in pairs(retryCooldown) do
+			if (not garbageQueue[name] and when < now) then
+				retryCooldown[name] = nil
+			end
+		end
+
+		local waiting
+		for name,guid in pairs(garbageQueue) do
+			local when = retryCooldown[name]
+			if (not when or when < now) then
+				retryCooldown[name] = nil
+				garbageQueue[name] = nil
+				inspectQueue[name] = guid
+			else
+				waiting = true
+			end
+		end
+
+		if (not waiting and not next(inspectQueue)) then
 			frame:Hide()
 		end
 	end
@@ -254,6 +271,8 @@ end
 
 -- INSPECT_TALENT_READY
 function lib:INSPECT_TALENT_READY()
+	-- [SIRUS] An untracked or late response must not consume the next inspect.
+	if self.lastInspectPending <= 0 then return end
 	self.lastInspectPending = self.lastInspectPending - 1
 
 	-- Results are valid only when we have received as many events as we have posted notifies
@@ -277,16 +296,6 @@ function lib:INSPECT_TALENT_READY()
 				self:Reset()
 				self:CheckInspectQueue()
 				return
-
-			elseif (validateTrees) then
-				-- Double checking here. Check the tree name matches what we expect for this class
-				local _, class = UnitClass(self.lastInspectUnit)
-				if (tree1 ~= validateTrees[class]) then
-					garbageQueue[self.lastInspectName] = self.lastInspectGUID
-					self:Reset()
-					self:CheckInspectQueue()
-					return
-				end
 			end
 
 			local tree2, _, spent2 = GetTalentTabInfo(2, isnotplayer, nil, group)
@@ -322,36 +331,6 @@ function lib:PLAYER_LEAVING_WORLD()
 end
 
 function lib:PLAYER_LOGIN()
-	validateTrees = {
-		DRUID = "Balance",
-		PRIEST = "Discipline",
-		ROGUE = "Assassination",
-		HUNTER = "Beast Mastery",
-		WARLOCK = "Affliction",
-		WARRIOR = "Arms",
-		DEATHKNIGHT = "Blood",
-		PALADIN = "Holy",
-		SHAMAN = "Elemental",
-		MAGE = "Arcane",
-	}
-
-	if (GetLocale() ~= "enUS" and GetLocale() ~= "enGB") then
-		-- LibBabble-TalentTree-3.0 only loaded if present and not enUS
-		local LBT = LibStub("LibBabble-TalentTree-3.0", true)
-		if (not LBT) then
-			LoadAddOn("LibBabble-TalentTree-3.0")
-			LBT = LibStub("LibBabble-TalentTree-3.0", true)
-		end
-		LBT = LBT and LBT:GetLookupTable()
-		if (LBT) then
-			for class,tree1 in pairs(validateTrees) do
-				validateTrees[class] = LBT[tree1]
-			end
-		else
-			validateTrees = nil
-		end
-	end
-	
 	self.PLAYER_LOGIN = nil
 end
 

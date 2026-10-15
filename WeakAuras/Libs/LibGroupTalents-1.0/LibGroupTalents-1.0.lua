@@ -1,6 +1,6 @@
 --[[
 Name: LibGroupTalents-1.0
-Revision: $Rev: 56 $
+Revision: $Rev: 55 $
 Author: Zek
 Documentation: http://wowace.com/wiki/LibGroupTalents-1.0
 SVN: svn://svn.wowace.com/wow/libgrouptalents-1-0/mainline/trunk
@@ -66,7 +66,7 @@ Events:
 
 local TalentQuery = LibStub("LibTalentQuery-1.0")
 
-local MAJOR, MINOR = "LibGroupTalents-1.0", tonumber(("$Rev: 56 $"):match("(%d+)"))
+local MAJOR, MINOR = "LibGroupTalents-1.0", 10067
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
@@ -91,7 +91,13 @@ end
 
 local specChangers = {}
 for index,spellid in ipairs(_G.TALENT_ACTIVATION_SPELLS) do
-	specChangers[GetSpellInfo(spellid)] = index
+	if (index > 2) then
+		break
+	end
+	local spellname = GetSpellInfo(spellid)
+	if (spellname) then
+		specChangers[spellname] = index
+	end
 end
 
 local frame = lib.frame
@@ -122,6 +128,7 @@ if not lib.events then
 end
 
 local next, select, pairs, type = next, select, pairs, type
+local min = math.min
 local new, del, deepDel
 do
 	local list = setmetatable({},{__mode='k'})
@@ -175,33 +182,26 @@ do
 				lib:CheckForMissingTalents()
 			end
 		end
+
 		if (lib.talentTimers) then
 			delay = delay + elapsed
 			if (delay > 1) then
 				delay = 0
 				local now = GetTime()
-				if type(now) == "string" then
-					now = tonumber(now)
-				end
 				local triggers
 				for guid,when in pairs(lib.talentTimers) do
-					-- if now and when then
-						if type(when) == "string" then
-							when = tonumber(when)
+					if (now > when) then
+						-- Pass to second table to process, because RefreshTimers can affect this talentTimers table
+						-- So it's important we're not still iterating it at the time
+						if (not triggers) then
+							triggers = new()
 						end
-						if (now > when) then
-							-- Pass to second table to process, because RefreshTimers can affect this talentTimers table
-							-- So it's important we're not still iterating it at the time
-							if (not triggers) then
-								triggers = new()
-							end
-							triggers[guid] = true
-							lib.talentTimers[guid] = nil
-							if (not next(lib.talentTimers)) then
-								lib.talentTimers = del(lib.talentTimers)
-								break
-							end
-						-- end
+						triggers[guid] = true
+						lib.talentTimers[guid] = nil
+						if (not next(lib.talentTimers)) then
+							lib.talentTimers = del(lib.talentTimers)
+							break
+						end
 					end
 				end
 
@@ -313,13 +313,14 @@ end
 
 -- UNIT_AURA
 function lib:UNIT_AURA(unit)
-	if not unit then
-		return
-	end
+	if not unit then return end
+
 	local guid = UnitGUID(unit)
-	if (not UnitIsVisible(unit) or (self.wasOffline and self.wasOffline[guid or ""])) then
+	if not guid or not self.roster[guid] then return end
+
+	if (not UnitIsVisible(unit) or (self.wasOffline and self.wasOffline[guid])) then
 		if (not self.outOfSight) then
-			self.outOfSight = {}
+			self.outOfSight = new()
 		end
 		self.outOfSight[guid] = true
 		self:RefreshTalentsByGUID(guid)
@@ -397,13 +398,13 @@ function lib:OnRaidRosterUpdate()
 	end
 
 	if (next(additions)) then
-		for _,unit in pairs(additions) do
+		for guid,unit in pairs(additions) do
 			self:GetUnitTalents(unit)
 		end
 	end
 
 	if (next(changes)) then
-		for _,unit in pairs(changes) do
+		for guid,unit in pairs(changes) do
 			self:GetUnitTalents(unit)
 		end
 	end
@@ -413,15 +414,16 @@ function lib:OnRaidRosterUpdate()
 			local r = self.roster[guid]
 			if (r) then
 				self.events:Fire("LibGroupTalents_Remove", guid, r.name, r.realm)
-				self.roster[guid] = deepDel(r)
 
+				-- [SIRUS] Retire pending strings before returning the roster to the pool.
 				local classStorageStrings = self.pendingStorageStrings[r.class]
 				if (classStorageStrings) then
-					classStorageStrings[guid] = del(classStorageStrings[guid])
+					classStorageStrings[guid] = nil
 					if (not next(classStorageStrings)) then
-						self.pendingStorageStrings[r.class] = del(self.pendingStorageStrings[r.class])
+						self.pendingStorageStrings[r.class] = del(classStorageStrings)
 					end
 				end
+				self.roster[guid] = deepDel(r)
 			end
 		end
 
@@ -501,7 +503,7 @@ do
 
 	-- crc
 	local function crc32(str)
-		local val = tonumber((select(2, GetBuildInfo())))	-- Use WoW build as CRC base
+		local val = tonumber((select(2, GetBuildInfo()))) or 1 -- Use WoW build as CRC base
 		for i = 1,#str do
 			val = bit.band(val * 2 + str:byte(i), 0xFFFF)
 		end
@@ -554,6 +556,7 @@ do
 				local temp = table.concat(parts, ";", 1, #parts - 1)
 				if (crc32(temp) == strCRC) then
 					local part1 = new(strsplit(",", parts[1]))
+
 					while true do
 						local guid
 						local id = part1[1]
@@ -655,6 +658,7 @@ do
 						end
 						break
 					end
+
 					del(part1)
 				else
 					retInfo = "Invalid string"
@@ -707,6 +711,7 @@ function GetClassTalentData(unit)
 
 				if (next(data)) then
 					lib.classTalentData[class] = data
+
 					--for guid,r in pairs(lib.roster) do
 					--	if (r.class == class and r.talents) then
 					--		-- We picked up class talent data for a class after receiving talents for them via comms
@@ -716,6 +721,7 @@ function GetClassTalentData(unit)
 					--		lib.events:Fire("LibGroupTalents_Update", guid, unit, spec, n1, n2, n3)
 					--	end
 					--end
+
 					local classStorageStrings = lib.pendingStorageStrings[class]
 					if (classStorageStrings) then
 						local unitGUID = UnitGUID(unit)
@@ -755,6 +761,10 @@ local function ReadTalentGroup(isnotplayer, group, class)
 	local numTabs = GetNumTalentTabs(isnotplayer)
 	if (numTabs and numTabs >= 3 and GetNumTalents(1, isnotplayer) > 0) then
 		local ctd = lib.classTalentData[class]
+--[===[@debug@
+assert(ctd and ctd[1] and ctd[2] and ctd[3])
+assert(ctd[1].list and ctd[2].list and ctd[3].list)
+--@end-debug@]===]
 
 		local n = new()
 		for tab = 1, numTabs do
@@ -800,7 +810,7 @@ function lib:TalentQuery_Ready(e, name, realm, unit)
 
 		if (GetTalentTabInfo(1, isnotplayer)) then
 			local active = GetActiveTalentGroup(isnotplayer)
-			local numActive = GetNumTalentGroups(isnotplayer)
+			local numActive = min(GetNumTalentGroups(isnotplayer) or 1, 2)
 			local listUnspent, invalid
 			local talents = new()
 
@@ -973,7 +983,7 @@ function lib:GUIDHasGlyph(guid, glyphID, group)
 		local g = r.glyphs and r.glyphs[group or r.active]
 		if (g) then
 			local temp = new(strsplit(",", g))
-			for _,str in ipairs(temp) do
+			for i,str in ipairs(temp) do
 				local id = tonumber(str)
 				if (type(glyphID) == "number") then
 					if (glyphID == id) then
@@ -1018,7 +1028,7 @@ function lib:RefreshPlayerGlyphs()
 
 	local glyphs = new()
 	local any
-	for talentGroup = 1,GetNumTalentGroups() do
+	for talentGroup = 1,min(GetNumTalentGroups() or 1, 2) do
 		local list = new()
 		for i = 1,GetNumGlyphSockets() do
 			local enabled, glyphType, glyphSpell, icon = GetGlyphSocketInfo(i, talentGroup)
@@ -1154,7 +1164,7 @@ end
 -- CheckForMissingTalents
 function lib:CheckForMissingTalents()
 	local any
-	for _,info in pairs(self.roster) do
+	for guid,info in pairs(self.roster) do
 		local namerealm = RosterInfoFullName(info)
 		if (not info.talents or (not UnitIsVisible(namerealm) and UnitExists(namerealm)) or info.refresh) then
 			any = true
@@ -1304,7 +1314,7 @@ function lib:GetGUIDTalents(guid, refetch)
 			TalentQuery:Query(unit)
 
 			local namerealm = UnitFullName(unit)
-			local skipGlyphs
+			local skipGlyphs = nil
 			if (not r.talents and not r.requested) then
 				-- Don't need to query on a 'refetch' because they'll send changes anyway via comms
 				if (not UnitIsVisible(unit) or not CanInspect(unit)) then
@@ -1406,7 +1416,7 @@ function lib:CHAT_MSG_ADDON(prefix, msg, channel, sender)
 			local invalid
 			local pages = new(strsplit(";", str))
 			local glyphs = new()
-			for _,info in ipairs(pages) do
+			for page,info in ipairs(pages) do
 				local list = new(strsplit(",", info))
 				local tab = tonumber(tremove(list, 1))
 				if (tab) then
@@ -1467,7 +1477,7 @@ local function SendMy(sender, str)
 			lib:SendCommMessage(str, sender)
 		end
 	else
-		for _,info in pairs(lib.roster) do
+		for guid,info in pairs(lib.roster) do
 			if (info.version) then
 				local namerealm = RosterInfoFullName(info)
 				if (UnitIsConnected(namerealm)) then
@@ -1508,7 +1518,7 @@ end
 -- UserCount
 function lib:UserCount()
 	local count = 0
-	for _,info in pairs(self.roster) do
+	for guid,info in pairs(self.roster) do
 		if (info.version and not UnitIsUnit("player", RosterInfoFullName(info))) then
 			count = count + 1
 		end
@@ -1649,7 +1659,7 @@ end
 -- GetTalentCount
 function lib:GetTalentCount()
 	local count, missing = 0, 0
-	for _,info in pairs(self.roster) do
+	for guid,info in pairs(self.roster) do
 		if (info.talents) then
 			count = count + 1
 		else
@@ -1681,7 +1691,7 @@ end
 function lib:PurgeAndRescanTalents()
 	if (self.roster) then
 		wipe(self.pendingStorageStrings)
-		for _,info in pairs(self.roster) do
+		for guid,info in pairs(self.roster) do
 			info.talents = del(info.talents)
 			info.active = nil
 			info.numActive = nil

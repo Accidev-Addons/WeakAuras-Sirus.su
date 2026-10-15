@@ -42,33 +42,28 @@ local WrapData = {
 --- @type fun(id: auraId, cloneId: string, system: any, funcs: {name: string, arg: number}[])
 --- @return table wrappedSystem
 local function Wrap(id, cloneId, system, funcs)
-  if type(system) ~= "table" then
-    return system
-  end
   local wrappedSystem = {}
   for _, data in ipairs(funcs) do
-    local func = system[data.name]
-    if type(func) == "function" then
-      wrappedSystem[data.name] = function(...)
-        local packed = SafePack(...)
-        local oldArg = select(data.arg, ...)
-        if type(oldArg) == "function" then
-          packed[data.arg] = function(...)
-            local region = WeakAuras.GetRegion(id, cloneId)
-            if region then
-              Private.ActivateAuraEnvironmentForRegion(region)
-              local ok, err = pcall(oldArg, ...)
-              if not ok then
-                Private.GetErrorHandlerId(id, L["Callback function"])(err)
-              end
-              Private.ActivateAuraEnvironment()
-            else
-              return oldArg(...)
+    wrappedSystem[data.name] = function(...)
+      local argIndex = type((...)) == "table" and data.arg + 1 or data.arg
+      local packed = SafePack(...)
+      local oldArg = select(argIndex, ...)
+      if type(oldArg) == "function" then
+        packed[argIndex] = function(...)
+          local region = WeakAuras.GetRegion(id, cloneId)
+          if region then
+            Private.ActivateAuraEnvironmentForRegion(region)
+            local ok, err = pcall(oldArg, ...)
+            if not ok then
+              Private.GetErrorHandlerId(id, L["Callback function"])(err)
             end
+            Private.ActivateAuraEnvironment()
+          else
+            oldArg(...)
           end
         end
-        return func(SafeUnpack(packed))
       end
+      return system[data.name](SafeUnpack(packed))
     end
   end
   setmetatable(wrappedSystem, { __index = system, __metatable = false })
@@ -77,9 +72,10 @@ end
 
 Private.AuraEnvironmentWrappedSystem.Get = function(systemName, id, cloneId)
   local cloneIdKey = cloneId or ""
+  local system = systemName == "C_Timer" and Private.C_Timer or _G[systemName]
   wrappers[id] = wrappers[id] or {}
   wrappers[id][cloneIdKey] = wrappers[id][cloneIdKey] or {}
   wrappers[id][cloneIdKey][systemName] = wrappers[id][cloneIdKey][systemName]
-    or Wrap(id, cloneId, _G[systemName], WrapData[systemName])
+    or Wrap(id, cloneId, system, WrapData[systemName])
   return wrappers[id][cloneIdKey][systemName]
 end

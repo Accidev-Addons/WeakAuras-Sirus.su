@@ -466,7 +466,9 @@ end
 local function createThumbnail(parent)
   -- Preview frame
   local borderframe = CreateFrame("Frame", nil, parent);
+  if parent then
   borderframe:SetFrameLevel(parent:GetFrameLevel() + 1)
+  end
   --- @cast borderframe table|Frame
   borderframe:SetWidth(32);
   borderframe:SetHeight(32);
