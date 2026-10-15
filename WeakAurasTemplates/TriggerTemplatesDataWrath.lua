@@ -1363,6 +1363,28 @@ local function enrichDatabase()
   end
 end
 
+local function removeUnknownSpells(list)
+  for i = #list, 1, -1 do
+    local item = list[i]
+    if item.spell and item.type ~= "item" and not GetSpellInfo(item.spell) then
+      table.remove(list, i)
+    end
+  end
+end
+
+for _, class in pairs(templates.class) do
+  for _, spec in pairs(class) do
+    for _, section in pairs(spec) do
+      if section.args then
+        removeUnknownSpells(section.args)
+      end
+    end
+  end
+end
+for _, race in pairs(templates.race) do
+  removeUnknownSpells(race)
+end
+removeUnknownSpells(templates.general.args)
 
 enrichDatabase();
 

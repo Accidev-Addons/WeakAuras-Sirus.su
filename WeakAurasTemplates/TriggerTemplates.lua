@@ -1875,7 +1875,7 @@ function WeakAuras.CreateTemplateView(Private, frame)
       newView.chosenItemBatch = {};
     end
     newView.class = select(2, UnitClass("player"));
-    newView.spec = C_Talent.GetSpecInfoCache().activeTalentGroup
+    newView.spec = math.max(C_Talent.GetCurrentSpecTabIndex(), 1)
     newView.race = select(2, UnitRace('player'));
 
     createButtons();

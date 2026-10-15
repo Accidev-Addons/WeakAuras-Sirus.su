@@ -1291,11 +1291,8 @@ Private.unit_threat_situation_types = {
 }
 
 WeakAuras.class_types = {}
-for i = 1, GetNumClasses() do
-  local className, class = GetClassInfo(i)
-  if class then
-    WeakAuras.class_types[class] = WrapTextInColorCode(className, WA_GetClassColor(class))
-  end
+for i, class in ipairs(CLASS_SORT_ORDER) do
+  WeakAuras.class_types[class] = WrapTextInColorCode(LOCALIZED_CLASS_NAMES_MALE[class], WA_GetClassColor(class))
 end
 
 WeakAuras.race_types = {}
