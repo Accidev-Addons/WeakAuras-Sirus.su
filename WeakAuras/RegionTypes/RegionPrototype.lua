@@ -676,7 +676,9 @@ end
 local function Tick(self)
   Private.StartProfileAura(self.id)
   self.values.customTextUpdated = false
-  self.subRegionEvents:Notify("FrameTick")
+  if self:IsVisible() then
+    self.subRegionEvents:Notify("FrameTick")
+  end
   Private.StopProfileAura(self.id)
 end
 

@@ -1690,9 +1690,10 @@ function Private.ExecEnv.GetTotalCountCurrencies(currencyID)
 end
 
 local currenciesInitialized
+local currenciesRetryAt = 0
 
 local function InitializeCurrencies()
-  if currenciesInitialized then
+  if currenciesInitialized or GetTime() < currenciesRetryAt then
         return
       end
   ---@type table<number, string>
@@ -1746,6 +1747,9 @@ local function InitializeCurrencies()
   Private.discovered_currencies["member"] = "|Tinterface\\common\\ui-searchbox-icon:0:0:0:-2|t"..L["Specific Currency"];
   Private.discovered_currencies_sorted["member"] = -1;
   currenciesInitialized = complete and hasCurrency
+  if not currenciesInitialized then
+    currenciesRetryAt = GetTime() + 30
+  end
 end
 
 ---@type function

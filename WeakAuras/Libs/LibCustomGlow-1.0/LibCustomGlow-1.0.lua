@@ -5,11 +5,13 @@ https://www.wowace.com/projects/libbuttonglow-1-0
 
 -- luacheck: globals CreateFromMixins ObjectPoolMixin CreateTexturePool CreateFramePool
 
+local addonName = ...
 local MAJOR_VERSION = "LibCustomGlow-1.0"
-local MINOR_VERSION = 26
+local MINOR_VERSION = 27
 if not LibStub then error(MAJOR_VERSION .. " requires LibStub.") end
 local lib, oldversion = LibStub:NewLibrary(MAJOR_VERSION, MINOR_VERSION)
 if not lib then return end
+local reusePools = oldversion and oldversion >= 26
 local Masque = LibStub("Masque", true)
 
 local pairs, ipairs = pairs, ipairs
@@ -48,30 +50,33 @@ local function AnimateTexCoords(texture, textureWidth, textureHeight, frameWidth
   end
 end
 
--- ===============================================================================
--- !!! IMPORTANT: Requires Pools.lua to be loaded before this file !!!
--- ===============================================================================
-
--- ===============================================================================
--- !!! IMPORTANT: CHANGE `texturePath` BELOW TO POINT TO YOUR ADDON'S FILE LOCATION !!!
--- DON'T FORGET THE BACKSLASH AT THE END (\)!
--- Example: local texturePath = [[Interface\AddOns\YourAddon\Libs\]]
--- ===============================================================================
--- This is the path to the texture files used by this library.
-local texturePath = [[Interface\AddOns\WeakAuras\Libs\]]
+local textureProbe = CreateFrame("Frame"):CreateTexture()
+local function FindTexture(file)
+  for _, addon in ipairs({ addonName or "WeakAuras", "WeakAuras", "Cell" }) do
+    local path = [[Interface\AddOns\]] .. addon .. [[\Libs\LibCustomGlow-1.0\]] .. file
+    if textureProbe:SetTexture(path) then
+      textureProbe:SetTexture(nil)
+      return path
+    end
+  end
+end
 
 local textureList = {
-  buttonGlow = texturePath .. [[LibCustomGlow-1.0\IconAlert]],
-  buttonGlowAnts = texturePath .. [[LibCustomGlow-1.0\IconAlertAnts]],
-  buttonGlowAntsDesaturated = texturePath .. [[LibCustomGlow-1.0\IconAlertAnts_desaturated]],
-  empty = texturePath .. [[LibCustomGlow-1.0\AM_29]],
-  proc = texturePath .. [[LibCustomGlow-1.0\UIActionBarFX]],
-  procDesaturated = texturePath .. [[LibCustomGlow-1.0\UIActionBarFX_desaturated]],
+  buttonGlow = [[Interface\SpellActivationOverlay\IconAlert]],
+  buttonGlowAnts = [[Interface\SpellActivationOverlay\IconAlertAnts]],
+  buttonGlowAntsDesaturated = FindTexture("IconAlertAnts_desaturated") or [[Interface\SpellActivationOverlay\IconAlertAnts]],
+  proc = FindTexture("UIActionBarFX"),
+  procDesaturated = FindTexture("UIActionBarFX_desaturated"),
   white = [[Interface\BUTTONS\WHITE8X8]],
-  shine = texturePath .. [[LibCustomGlow-1.0\Artifacts]],
-  shineDesaturated = texturePath .. [[LibCustomGlow-1.0\Artifacts_desaturated]]
+  shine = FindTexture("Artifacts"),
+  shineDesaturated = FindTexture("Artifacts_desaturated"),
 }
 local shineCoords = {0.8115234375, 0.9169921875, 0.8798828125, 0.9853515625}
+if not textureList.shine then
+  textureList.shine = [[Interface\ItemSocketingFrame\UI-ItemSockets]]
+  shineCoords = {0.3984375, 0.4453125, 0.40234375, 0.44921875}
+end
+textureList.shineDesaturated = textureList.shineDesaturated or textureList.shine
 
 function lib.RegisterTextures(texture, id)
   textureList[id] = texture
@@ -87,7 +92,7 @@ local TexPoolResetter = function(pool, tex)
   tex:Hide()
   tex:ClearAllPoints()
 end
-local GlowTexPool = CreateTexturePool(GlowParent, "ARTWORK", 7, nil, TexPoolResetter)
+local GlowTexPool = reusePools and lib.GlowTexPool or CreateTexturePool(GlowParent, "ARTWORK", 7, nil, TexPoolResetter)
 lib.GlowTexPool = GlowTexPool
 
 local FramePoolResetter = function(framePool, frame)
@@ -113,7 +118,7 @@ local FramePoolResetter = function(framePool, frame)
   frame:ClearAllPoints()
 end
 
-local GlowFramePool = CreateFramePool("Frame", GlowParent, "", FramePoolResetter)
+local GlowFramePool = reusePools and lib.GlowFramePool or CreateFramePool("Frame", GlowParent, "", FramePoolResetter)
 lib.GlowFramePool = GlowFramePool
 
 local function addFrameAndTex(r, color, name, key, N, xOffset, yOffset, texture, texCoord, desaturated, frameLevel)
@@ -150,6 +155,7 @@ local function addFrameAndTex(r, color, name, key, N, xOffset, yOffset, texture,
     f.textures[i]:SetTexture(texture)
     f.textures[i]:SetVertexColor(color[1], color[2], color[3], color[4])
     f.textures[i]:Show()
+    f.textures[i].pt, f.textures[i].sw, f.textures[i].sh, f.textures[i].on = nil, nil, nil, nil
   end
 
   while #f.textures > N do
@@ -166,37 +172,65 @@ local pPoint = {
   ["TOPLEFT"] = "BOTTOMLEFT",
 }
 
+local function pSetPoint(line, point, x, y)
+  if line.pt ~= point then
+    line:ClearAllPoints()
+    line.pt = point
+  end
+  line:SetPoint(point, x, y)
+end
+
+local function pSetSize(line, width, height)
+  if line.sw ~= width or line.sh ~= height then
+    line:SetSize(width, height)
+    line.sw, line.sh = width, height
+  end
+end
+
+local function pShow(line, point)
+  if line.pt ~= point then
+    line:ClearAllPoints()
+    line:SetPoint(point)
+    line.pt = point
+  end
+  if not line.on then
+    line:Show()
+    line.on = true
+  end
+end
+
+local function pHide(line)
+  if line.on ~= false then
+    line:Hide()
+    line.on = false
+  end
+end
+
 local function pWidth(position, width, length, thickness, line1, line2, point)
-  line1:ClearAllPoints()
-  line1:SetPoint(pPoint[point], point == "BOTTOMLEFT" and -position or position, 0)
+  pSetPoint(line1, pPoint[point], point == "BOTTOMLEFT" and -position or position, 0)
   position = width - position
   if position > length then
-    line1:SetSize(length, thickness)
-    line2:Hide()
+    pSetSize(line1, length, thickness)
+    pHide(line2)
   else
-    line2:ClearAllPoints()
-    line2:SetPoint(point)
-    line2:Show()
+    pShow(line2, point)
 
-    line1:SetSize(position, thickness)
-    line2:SetSize(thickness, length - position)
+    pSetSize(line1, position, thickness)
+    pSetSize(line2, thickness, length - position)
   end
 end
 
 local function pHeight(position, height, length, thickness, line1, line2, point)
-  line1:ClearAllPoints()
-  line1:SetPoint(pPoint[point], 0, point == "BOTTOMRIGHT" and -position or position)
+  pSetPoint(line1, pPoint[point], 0, point == "BOTTOMRIGHT" and -position or position)
   position = height - position
   if position > length then
-    line1:SetSize(thickness, length)
-    line2:Hide()
+    pSetSize(line1, thickness, length)
+    pHide(line2)
   else
-    line2:ClearAllPoints()
-    line2:SetPoint(point)
-    line2:Show()
+    pShow(line2, point)
 
-    line1:SetSize(thickness, position)
-    line2:SetSize(length - position, thickness)
+    pSetSize(line1, thickness, position)
+    pSetSize(line2, length - position, thickness)
   end
 end
 
@@ -595,7 +629,7 @@ local function ButtonGlowResetter(framePool,frame)
   frame:Hide()
   frame:ClearAllPoints()
 end
-local ButtonGlowPool = CreateFramePool("Frame", GlowParent, "", ButtonGlowResetter)
+local ButtonGlowPool = reusePools and lib.ButtonGlowPool or CreateFramePool("Frame", GlowParent, "", ButtonGlowResetter)
 lib.ButtonGlowPool = ButtonGlowPool
 
 local function AnimIn_OnPlay(anim)
@@ -960,7 +994,7 @@ local function ProcGlowResetter(framePool, frame)
   end
 end
 
-local ProcGlowPool = CreateFramePool("Frame", GlowParent, "", ProcGlowResetter)
+local ProcGlowPool = reusePools and lib.ProcGlowPool or CreateFramePool("Frame", GlowParent, "", ProcGlowResetter)
 lib.ProcGlowPool = ProcGlowPool
 
 local function InitProcGlow(f)
@@ -985,6 +1019,18 @@ end
 
 local function SetupProcGlow(f, options)
   f.key = "_ProcGlow" .. options.key -- for resetter
+
+  if not textureList.proc then
+    f.ProcLoop:SetTexture(textureList.buttonGlow)
+    if options.color then
+      f.ProcLoop:SetTexCoord(0.00781250, 0.50781250, 0.53515625, 0.78515625)
+    else
+      f.ProcLoop:SetTexCoord(0.00781250, 0.50781250, 0.27734375, 0.52734375)
+    end
+    f.ProcLoop:SetVertexColor(unpack(options.color or {1, 1, 1, 1}))
+    f.ProcLoop:Show()
+    return
+  end
 
   f:SetScript("OnHide", function(self)
     StopFlipbook(self)

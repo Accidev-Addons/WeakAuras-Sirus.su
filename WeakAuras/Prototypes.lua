@@ -5821,10 +5821,10 @@ Private.event_prototypes = {
       local ret = [[
         local itemName = %s
         local exactSpellMatch = %s
-        local _, itemLink = GetItemInfo(itemName)
+        local itemInfoName, itemLink = GetItemInfo(itemName)
         local itemId = tonumber(itemName) or (itemLink and tonumber(itemLink:match("item:(%%d+)")))
         if not exactSpellMatch and tonumber(itemName) then
-          itemName = GetItemInfo(itemName)
+          itemName = itemInfoName
         end
         local count = GetItemCount(itemName or "", %s, %s);
       ]];
@@ -5924,7 +5924,7 @@ Private.event_prototypes = {
       },
       {
         name = "name",
-        init = "itemName and itemName ~= '' and GetItemInfo(itemName) or itemName",
+        init = "itemName and itemName ~= '' and itemInfoName or itemName",
         hidden = true,
         store = true,
         test = "true"
@@ -6548,13 +6548,17 @@ Private.event_prototypes = {
         "RUNE_TYPE_UPDATE"
       }
     },
-    internal_events = {
-      "RUNE_COOLDOWN_READY",
-      "RUNE_COOLDOWN_CHANGED",
-      "RUNE_COOLDOWN_STARTED",
-      "COOLDOWN_REMAINING_CHECK",
-      "WA_DELAYED_PLAYER_ENTERING_WORLD"
-    },
+    internal_events = function(trigger)
+      local rune = trigger.use_rune and tonumber(trigger.rune)
+      local suffix = rune and rune > 0 and (":" .. rune) or ""
+      return {
+        "RUNE_COOLDOWN_READY" .. suffix,
+        "RUNE_COOLDOWN_CHANGED" .. suffix,
+        "RUNE_COOLDOWN_STARTED" .. suffix,
+        "COOLDOWN_REMAINING_CHECK",
+        "WA_DELAYED_PLAYER_ENTERING_WORLD"
+      }
+    end,
     force_events = "RUNE_COOLDOWN_FORCE",
     name = L["Death Knight Rune"],
     loadFunc = function(trigger)
@@ -6616,7 +6620,7 @@ Private.event_prototypes = {
       end
       return ret:format(
         trigger.rune,
-        "[[" .. (trigger.genericShowOn or "") .. "]]",
+        "[[" .. (trigger.genericShowOn or (trigger.use_inverse and "showOnCooldown" or "showAlways")) .. "]]",
         (trigger.use_includeDeathRunes and "true" or "false")
       );
     end,

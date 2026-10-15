@@ -1649,7 +1649,7 @@ local function scanForLoadsImpl(toCheck, event, arg1, ...)
       local loadFunc = loadFuncs[id];
       local loadOpt = loadFuncsForOptions[id];
       shouldBeLoaded = loadFunc and loadFunc("ScanForLoads_Auras", inCombat, alive, inEncounter, pvp, vehicle, vehicleUi, mounted, class, specId, player, realm, guild, race, constellation, faction, playerLevel, role, position, raidRole, group, groupSize, raidMemberType, zone, zoneId, subzone, encounter_id, size, difficulty);
-      couldBeLoaded =  loadOpt and loadOpt("ScanForLoads_Auras",   inCombat, alive, inEncounter, pvp, vehicle, vehicleUi, mounted, class, specId, player, realm, guild, race, constellation, faction, playerLevel, role, position, raidRole, group, groupSize, raidMemberType, zone, zoneId, subzone, encounter_id, size, difficulty);
+      couldBeLoaded = shouldBeLoaded or loadOpt and loadOpt("ScanForLoads_Auras",   inCombat, alive, inEncounter, pvp, vehicle, vehicleUi, mounted, class, specId, player, realm, guild, race, constellation, faction, playerLevel, role, position, raidRole, group, groupSize, raidMemberType, zone, zoneId, subzone, encounter_id, size, difficulty);
 
       if(shouldBeLoaded and not loaded[id]) then
         changed = changed + 1;
@@ -1671,7 +1671,7 @@ local function scanForLoadsImpl(toCheck, event, arg1, ...)
         loaded[id] = true;
       elseif(couldBeLoaded) then
         loaded[id] = false;
-      else
+      elseif loaded[id] ~= nil then
         loaded[id] = nil;
       end
     end
@@ -1756,10 +1756,26 @@ unitLoadFrame:RegisterEvent("UNIT_EXITED_VEHICLE");
 unitLoadFrame:RegisterEvent("UNIT_FACTION");
 unitLoadFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
 
+local talentGroup, talentPoints1, talentPoints2, talentPoints3
+local function TalentsChanged()
+  local group = C_Talent.GetActiveTalentGroup()
+  local _, _, points1 = GetTalentTabInfo(1)
+  local _, _, points2 = GetTalentTabInfo(2)
+  local _, _, points3 = GetTalentTabInfo(3)
+  if group == talentGroup and points1 == talentPoints1 and points2 == talentPoints2 and points3 == talentPoints3 then
+    return false
+  end
+  talentGroup, talentPoints1, talentPoints2, talentPoints3 = group, points1, points2, points3
+  return true
+end
+
 function Private.RegisterLoadEvents()
-  loadFrame:SetScript("OnEvent", function(frame, ...)
+  loadFrame:SetScript("OnEvent", function(frame, event, ...)
+    if event == "SPELL_UPDATE_USABLE" and not TalentsChanged() then
+      return
+    end
     Private.StartProfileSystem("load");
-    Private.ScanForLoads(nil, ...)
+    Private.ScanForLoads(nil, event, ...)
     Private.StopProfileSystem("load");
   end);
 

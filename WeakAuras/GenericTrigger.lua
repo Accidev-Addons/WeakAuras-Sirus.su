@@ -661,10 +661,22 @@ local function ignoreErrorHandler()
 
 end
 
+local function CreateLabelCache(format)
+	return setmetatable({}, { __index = function(labels, triggernum)
+		local label = format:format(tostring(triggernum))
+		if triggernum ~= nil then
+			labels[triggernum] = label
+		end
+		return label
+	end })
+end
+local triggerLabels = CreateLabelCache(L["Trigger %s"])
+local untriggerLabels = CreateLabelCache(L["Untrigger %s"])
+
 local function RunTriggerFunc(allStates, data, id, triggernum, event, arg1, arg2, ...)
 	local optionsEvent = event == "OPTIONS";
 	local errorHandler = (optionsEvent and data.ignoreOptionsEventErrors) and ignoreErrorHandler or
-	Private.GetErrorHandlerId(id, L["Trigger %s"]:format(triggernum))
+	Private.GetErrorHandlerId(id, triggerLabels[triggernum])
 	local updateTriggerState = false;
 
 	local unitForUnitTrigger
@@ -817,7 +829,7 @@ local function RunTriggerFunc(allStates, data, id, triggernum, event, arg1, arg2
       end
     end
     if (untriggerCheck and not optionsEvent) then
-      errorHandler = (optionsEvent and data.ignoreOptionsEventErrors) and ignoreErrorHandler or Private.GetErrorHandlerId(id, L["Untrigger %s"]:format(triggernum))
+      errorHandler = (optionsEvent and data.ignoreOptionsEventErrors) and ignoreErrorHandler or Private.GetErrorHandlerId(id, untriggerLabels[triggernum])
       if (data.statesParameter == "all") then
         if data.untriggerFunc then
           local ok, returnValue = pcall(data.untriggerFunc, allStates, event, arg1, arg2, ...);
@@ -3120,7 +3132,7 @@ do
 		runeCdHandles[id] = nil;
 		runeCdDurs[id] = nil;
 		runeCdExps[id] = nil;
-		Private.ScanEvents("RUNE_COOLDOWN_READY", id);
+		Private.ScanEventsByID("RUNE_COOLDOWN_READY", id);
 	end
 
 	local function ItemCooldownFinished(id)
@@ -3163,7 +3175,7 @@ do
 					runeCdDurs[id] = duration;
 					runeCdExps[id] = endTime;
 					runeCdHandles[id] = timer:ScheduleTimer(RuneCooldownFinished, endTime - time, id);
-					Private.ScanEvents("RUNE_COOLDOWN_STARTED", id);
+					Private.ScanEventsByID("RUNE_COOLDOWN_STARTED", id);
 				elseif (runeCdExps[id] ~= endTime) then
 					-- Cooldown is now different
 					if (runeCdHandles[id]) then
@@ -3172,7 +3184,7 @@ do
 					runeCdDurs[id] = duration;
 					runeCdExps[id] = endTime;
 					runeCdHandles[id] = timer:ScheduleTimer(RuneCooldownFinished, endTime - time, id);
-					Private.ScanEvents("RUNE_COOLDOWN_CHANGED", id);
+					Private.ScanEventsByID("RUNE_COOLDOWN_CHANGED", id);
 				end
 			elseif (duration > 0) then
 				-- GCD, do nothing

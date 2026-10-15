@@ -1879,6 +1879,10 @@ end
 
 local function RecheckActiveForUnitType(unitType, unit, unitsToRemoveScan)
   if groupScanFuncs[unitType] then
+    local active = activeGroupScanFuncs[unit]
+    if not (active and next(active)) and not UnitExistsFixed(unit) then
+      return
+    end
     for i, triggerInfo in ipairs(groupScanFuncs[unitType]) do
       RecheckActive(triggerInfo, unit, unitsToRemoveScan)
     end

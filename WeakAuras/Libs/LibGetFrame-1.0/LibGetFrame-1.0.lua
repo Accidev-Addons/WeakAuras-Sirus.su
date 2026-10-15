@@ -120,6 +120,7 @@ local defaultFramePriorities = {
   "^ERFPartySelfButton$", -- EllesmereUI (static self frame)
   "^CompactRaid", -- blizz
   "^CompactParty", -- blizz
+  "^CompactArena", -- blizz
   "^PartyFrame", -- blizz
   "^PartyMemberFrame", -- blizz
     -- boss frames
@@ -698,8 +699,14 @@ local function Init(noDelay)
   GetFramesCacheListener:RegisterEvent("PARTY_MEMBERS_CHANGED")
   GetFramesCacheListener:RegisterEvent("UNIT_PET")
   GetFramesCacheListener:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
+  GetFramesCacheListener:RegisterEvent("UNIT_ENTERED_VEHICLE")
+  GetFramesCacheListener:RegisterEvent("UNIT_EXITED_VEHICLE")
   GetFramesCacheListener:SetScript("OnEvent", function(self, event, unit, ...)
     fixGetUnitFrameIntegrity()
+    if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE")
+    and not (UnitIsUnit("player", unit) or UnitInParty(unit) or UnitInRaid(unit)) then
+      return
+    end
     if event == "RAID_ROSTER_UPDATE" or event == "PARTY_MEMBERS_CHANGED" then
       wipe(unitPetState)
       for member in IterateGroupMembers() do
