@@ -181,6 +181,12 @@ globals = {
 	"STANDARD_TEXT_FONT",
 	"MAX_BOSS_FRAMES",
 	"MAX_SPELL_SCHOOLS",
+	"C_Talent",
+	"C_ZodiacSign",
+	"E_CHARACTER_RACES",
+	"FACTION_RENEGADE",
+	"utf8",
+	"ZODIAC_DEBUFFS",
 
 	-- ENUMS
 	"LOWER_LEFT_VERTEX",

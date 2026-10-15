@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/**.yml'
+      - '.luacheckrc'
       - '**.lua'
   pull_request:
     paths:
